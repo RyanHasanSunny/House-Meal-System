@@ -98,6 +98,7 @@ class FinanceSummaryTest extends TestCase
 
         MemberPayment::query()->create([
             'user_id' => $admin->id,
+            'grocery_item_id' => null,
             'amount' => 200,
             'paid_on' => '2026-06-02',
             'notes' => null,
@@ -106,6 +107,7 @@ class FinanceSummaryTest extends TestCase
 
         MemberPayment::query()->create([
             'user_id' => $member->id,
+            'grocery_item_id' => null,
             'amount' => 450,
             'paid_on' => '2026-06-03',
             'notes' => null,
@@ -140,5 +142,68 @@ class FinanceSummaryTest extends TestCase
         $this->assertEquals(450.0, $members['finance-member']['paid_amount']);
         $this->assertEquals(0.0, $members['finance-member']['due_amount']);
         $this->assertEquals(50.0, $members['finance-member']['advance_amount']);
+    }
+
+    public function test_member_can_view_monthly_finance_summary(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Admin User',
+            'username' => 'summary-admin',
+            'email' => 'summary-admin@example.com',
+            'role' => UserRole::Admin->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => '2026-06-01',
+        ]);
+
+        $member = User::query()->create([
+            'name' => 'Member User',
+            'username' => 'summary-member',
+            'email' => 'summary-member@example.com',
+            'role' => UserRole::Member->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => '2026-06-01',
+        ]);
+
+        $catalogItem = GroceryCatalogItem::query()->create([
+            'name' => 'Lentils',
+            'category' => 'Staples',
+            'default_unit' => 'kg',
+            'sort_order' => 1,
+            'is_active' => true,
+            'created_by' => $admin->id,
+        ]);
+
+        $mealPlan = MealPlan::query()->create([
+            'name' => 'June Summary Plan',
+            'type' => 'custom',
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-01',
+            'notes' => null,
+            'created_by' => $admin->id,
+        ]);
+
+        app(MealStatusService::class)->syncStatusesForPlan($mealPlan);
+
+        GroceryItem::query()->create([
+            'meal_plan_id' => $mealPlan->id,
+            'grocery_catalog_item_id' => $catalogItem->id,
+            'title' => 'Lentils',
+            'category' => 'Staples',
+            'quantity' => 2,
+            'unit' => 'kg',
+            'price' => 240,
+            'purchased_on' => '2026-06-01',
+            'notes' => null,
+            'added_by' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($member);
+
+        $this->getJson('/api/finance-summary/monthly?month=2026-06')
+            ->assertOk()
+            ->assertJsonPath('data.totals.total_gross', 240)
+            ->assertJsonCount(2, 'data.members');
     }
 }

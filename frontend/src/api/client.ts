@@ -2,8 +2,20 @@ import axios from 'axios'
 
 export const TOKEN_STORAGE_KEY = 'house-meal-system-token'
 
+function resolveApiBaseUrl() {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL
+  }
+
+  if (import.meta.env.DEV) {
+    return 'http://127.0.0.1:8000/api'
+  }
+
+  return `${window.location.origin}/api`
+}
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000/api',
+  baseURL: resolveApiBaseUrl(),
   headers: {
     Accept: 'application/json',
   },

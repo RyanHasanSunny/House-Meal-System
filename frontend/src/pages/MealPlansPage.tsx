@@ -1,4 +1,4 @@
-import { CalendarRange, ScrollText, ShoppingBasket } from 'lucide-react'
+import { CalendarRange, ScrollText, ShoppingBasket, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { api, getApiErrorMessage } from '../api/client'
@@ -11,7 +11,9 @@ import { SectionHeading } from '../components/ui/SectionHeading'
 import { Select } from '../components/ui/Select'
 import { Spinner } from '../components/ui/Spinner'
 import { TextArea } from '../components/ui/TextArea'
+import { cn } from '../lib/cn'
 import { formatCurrency, formatDate, isDateActive, todayValue } from '../lib/format'
+import { useAuth } from '../providers/AuthProvider'
 import type { MealPlan, MealPlanSummary } from '../types'
 
 type PlanFormState = {
@@ -36,6 +38,7 @@ function daysInMonth(dateString: string) {
 const defaultStartDate = todayValue()
 
 export function MealPlansPage() {
+  const { user } = useAuth()
   const [plans, setPlans] = useState<MealPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<MealPlan | null>(null)
   const [form, setForm] = useState<PlanFormState>({
@@ -47,6 +50,9 @@ export function MealPlansPage() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<MealPlan | null>(null)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
@@ -150,6 +156,42 @@ export function MealPlansPage() {
     }
   }
 
+  function openDeleteModal(plan: MealPlan) {
+    setError('')
+    setMessage('')
+    setDeleteTarget(plan)
+    setDeleteConfirmation('')
+  }
+
+  async function handleDeletePlan() {
+    if (!deleteTarget) {
+      return
+    }
+
+    setError('')
+    setMessage('')
+    setIsDeleting(true)
+
+    try {
+      await api.delete(`/meal-plans/${deleteTarget.id}`, {
+        data: {
+          confirmation_name: deleteConfirmation,
+        },
+      })
+
+      const nextPlans = plans.filter((plan) => plan.id !== deleteTarget.id)
+      setPlans(nextPlans)
+      setSelectedPlan((current) => (current?.id === deleteTarget.id ? null : current))
+      setDeleteTarget(null)
+      setDeleteConfirmation('')
+      setMessage('Meal plan deleted successfully.')
+    } catch (deleteError) {
+      setError(getApiErrorMessage(deleteError))
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="panel flex min-h-[320px] items-center justify-center">
@@ -160,10 +202,7 @@ export function MealPlansPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading
-        title="Meal Plans"
-        copy="Plans now carry both meal tracking and the grocery ledger, so each cycle has one operational record."
-      />
+      <SectionHeading title="Meal Plans" />
 
       <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
         <Card>
@@ -173,7 +212,6 @@ export function MealPlansPage() {
             </div>
             <div>
               <h2 className="text-2xl font-bold">Create Plan</h2>
-              <p className="mt-1 text-sm text-stone-600">Set the date range first. Grocery items will be added under the plan after creation.</p>
             </div>
           </div>
 
@@ -247,19 +285,21 @@ export function MealPlansPage() {
                       {plan.meal_statuses_count} member-day entries | {plan.grocery_items_count} grocery items
                     </p>
                   </div>
-                  <Button variant="ghost" onClick={() => handlePlanSelect(plan.id)}>
-                    View Summary
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="ghost" onClick={() => handlePlanSelect(plan.id)}>
+                      View Summary
+                    </Button>
+                    {user?.role === 'super_admin' ? (
+                      <Button variant="ghost" onClick={() => openDeleteModal(plan)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               </Card>
             ))
-          ) : (
-            <EmptyState
-              icon={ScrollText}
-              title="No meal plans yet"
-              copy="Create the first weekly, monthly, or custom schedule to begin member and grocery tracking."
-            />
-          )}
+          ) : <EmptyState icon={ScrollText} title="No meal plans yet" />}
         </div>
       </div>
 
@@ -309,7 +349,6 @@ export function MealPlansPage() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-2xl font-bold">Groceries Under This Plan</h2>
-                <p className="mt-2 text-sm text-stone-600">All grocery cost is attached directly to this meal plan.</p>
               </div>
               <Badge variant="accent">{formatCurrency(selectedPlan.groceries.total_spend)}</Badge>
             </div>
@@ -334,16 +373,13 @@ export function MealPlansPage() {
                   </div>
                 ))}
               </div>
-            ) : (
-              <EmptyState icon={ShoppingBasket} title="No groceries yet" copy="Use the groceries screen to add items under this plan." />
-            )}
+            ) : <EmptyState icon={ShoppingBasket} title="No groceries yet" />}
           </Card>
 
           <Card>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-2xl font-bold">Member Breakdown</h2>
-                <p className="mt-2 text-sm text-stone-600">Every unmarked meal remains counted as taken inside the selected plan.</p>
               </div>
               <Badge variant="brand">{selectedSummary.tracked_days} tracked days</Badge>
             </div>
@@ -376,6 +412,49 @@ export function MealPlansPage() {
           </Card>
         </div>
       ) : null}
+
+      <div
+        className={cn(
+          'fixed inset-0 z-[70] flex items-center justify-center bg-ink-950/55 px-4 transition',
+          deleteTarget ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        )}
+      >
+        <div className="w-full max-w-lg rounded-[28px] bg-white p-5 shadow-[0_30px_80px_-30px_rgba(21,21,22,0.55)] sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="mt-2 text-2xl font-bold">Delete Meal Plan</h2>
+            </div>
+            <Button type="button" variant="ghost" onClick={() => setDeleteTarget(null)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {deleteTarget ? (
+            <div className="mt-6 space-y-4">
+              <div className="rounded-[22px] border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
+                {deleteTarget.name}
+              </div>
+              <div>
+                <label className="field-label">Type Plan Name</label>
+                <Input value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} />
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <Button type="button" variant="ghost" onClick={() => setDeleteTarget(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={isDeleting || deleteConfirmation.trim() !== deleteTarget.name}
+                  type="button"
+                  variant="danger"
+                  onClick={() => void handleDeletePlan()}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Plan'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
     </div>
   )
 }

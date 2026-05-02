@@ -81,6 +81,11 @@ export interface GroceryItem {
     start_date: string
     end_date: string
   } | null
+  member: {
+    id: number
+    name: string
+    username: string
+  } | null
   catalog_item: GroceryCatalogItem | null
   title: string
   category: string | null
@@ -118,6 +123,8 @@ export interface MealStatus {
   lunch_status: 'taken' | 'skipped'
   dinner_status: 'taken' | 'skipped'
   can_edit: boolean
+  can_edit_lunch: boolean
+  can_edit_dinner: boolean
   meal_plan: {
     id: number
     name: string

@@ -8,7 +8,7 @@ export function EmptyState({
 }: {
   icon: LucideIcon
   title: string
-  copy: string
+  copy?: string
 }) {
   return (
     <Card className="border-dashed text-center">
@@ -16,7 +16,7 @@ export function EmptyState({
         <Icon className="h-6 w-6" />
       </div>
       <h3 className="text-xl font-bold">{title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">{copy}</p>
+      {copy ? <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">{copy}</p> : null}
     </Card>
   )
 }

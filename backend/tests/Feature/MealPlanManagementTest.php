@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Enums\UserRole;
 use App\Models\GroceryCatalogItem;
 use App\Models\MealPlan;
+use App\Models\MemberPayment;
+use App\Models\MealStatus;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -183,6 +185,7 @@ class MealPlanManagementTest extends TestCase
             'meal_plan_id' => $mealPlan->id,
             'grocery_catalog_item_id' => $catalogItem->id,
             'quantity' => 5,
+            'unit' => 'kg',
             'price' => 650,
             'purchased_on' => '2026-06-11',
             'notes' => 'Weekly stock',
@@ -196,8 +199,163 @@ class MealPlanManagementTest extends TestCase
 
         $this->assertDatabaseHas('grocery_items', [
             'meal_plan_id' => $mealPlan->id,
+            'member_id' => $admin->id,
             'grocery_catalog_item_id' => $catalogItem->id,
             'title' => 'Lentils',
         ]);
+
+        $grocery = \App\Models\GroceryItem::query()->firstOrFail();
+
+        $this->assertDatabaseHas('member_payments', [
+            'user_id' => $admin->id,
+            'grocery_item_id' => $grocery->id,
+            'amount' => 650,
+        ]);
+    }
+
+    public function test_admin_can_add_custom_grocery_item_with_manual_unit(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Custom Groceries Admin',
+            'username' => 'custom-groceries-admin',
+            'email' => 'custom-groceries-admin@example.com',
+            'role' => UserRole::Admin->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => now()->toDateString(),
+        ]);
+
+        $mealPlan = MealPlan::query()->create([
+            'name' => 'Custom Grocery Plan',
+            'type' => 'custom',
+            'start_date' => '2026-06-10',
+            'end_date' => '2026-06-20',
+            'notes' => null,
+            'created_by' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/groceries', [
+            'meal_plan_id' => $mealPlan->id,
+            'title' => 'Green Chili',
+            'quantity' => 2,
+            'unit' => 'kg',
+            'price' => 180,
+            'purchased_on' => '2026-06-12',
+            'notes' => 'Fresh market buy',
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.meal_plan.id', $mealPlan->id)
+            ->assertJsonPath('data.catalog_item', null)
+            ->assertJsonPath('data.title', 'Green Chili')
+            ->assertJsonPath('data.unit', 'kg');
+
+        $this->assertDatabaseHas('grocery_items', [
+            'meal_plan_id' => $mealPlan->id,
+            'member_id' => $admin->id,
+            'grocery_catalog_item_id' => null,
+            'title' => 'Green Chili',
+            'unit' => 'kg',
+        ]);
+    }
+
+    public function test_super_admin_can_delete_meal_plan_after_typing_exact_name(): void
+    {
+        $superAdmin = User::query()->create([
+            'name' => 'Super Admin',
+            'username' => 'super-admin',
+            'email' => 'super-admin@example.com',
+            'role' => UserRole::SuperAdmin->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => now()->toDateString(),
+        ]);
+
+        $mealPlan = MealPlan::query()->create([
+            'name' => 'Delete Me Plan',
+            'type' => 'custom',
+            'start_date' => '2026-06-10',
+            'end_date' => '2026-06-20',
+            'notes' => null,
+            'created_by' => $superAdmin->id,
+        ]);
+
+        $grocery = \App\Models\GroceryItem::query()->create([
+            'meal_plan_id' => $mealPlan->id,
+            'member_id' => $superAdmin->id,
+            'title' => 'Rice',
+            'category' => 'Staples',
+            'quantity' => 5,
+            'unit' => 'kg',
+            'price' => 500,
+            'purchased_on' => '2026-06-11',
+            'notes' => null,
+            'added_by' => $superAdmin->id,
+        ]);
+
+        $payment = MemberPayment::query()->create([
+            'user_id' => $superAdmin->id,
+            'grocery_item_id' => $grocery->id,
+            'amount' => 500,
+            'paid_on' => '2026-06-11',
+            'notes' => 'Grocery payment',
+            'recorded_by' => $superAdmin->id,
+        ]);
+
+        MealStatus::query()->create([
+            'user_id' => $superAdmin->id,
+            'meal_plan_id' => $mealPlan->id,
+            'meal_date' => '2026-06-11',
+            'skip_lunch' => false,
+            'skip_dinner' => false,
+        ]);
+
+        Sanctum::actingAs($superAdmin);
+
+        $this->deleteJson("/api/meal-plans/{$mealPlan->id}", [
+            'confirmation_name' => 'Wrong Name',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('confirmation_name');
+
+        $this->deleteJson("/api/meal-plans/{$mealPlan->id}", [
+            'confirmation_name' => 'Delete Me Plan',
+        ])->assertOk()
+            ->assertJsonPath('message', 'Meal plan deleted successfully.');
+
+        $this->assertDatabaseMissing('meal_plans', ['id' => $mealPlan->id]);
+        $this->assertDatabaseMissing('grocery_items', ['id' => $grocery->id]);
+        $this->assertDatabaseMissing('member_payments', ['id' => $payment->id]);
+        $this->assertDatabaseMissing('meal_statuses', ['meal_plan_id' => $mealPlan->id]);
+    }
+
+    public function test_admin_cannot_delete_meal_plan(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Admin',
+            'username' => 'admin-delete-check',
+            'email' => 'admin-delete-check@example.com',
+            'role' => UserRole::Admin->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => now()->toDateString(),
+        ]);
+
+        $mealPlan = MealPlan::query()->create([
+            'name' => 'Protected Plan',
+            'type' => 'custom',
+            'start_date' => '2026-06-10',
+            'end_date' => '2026-06-20',
+            'notes' => null,
+            'created_by' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->deleteJson("/api/meal-plans/{$mealPlan->id}", [
+            'confirmation_name' => 'Protected Plan',
+        ])->assertForbidden();
     }
 }

@@ -9,6 +9,7 @@ class MemberPayment extends Model
 {
     protected $fillable = [
         'user_id',
+        'grocery_item_id',
         'amount',
         'paid_on',
         'notes',
@@ -26,6 +27,11 @@ class MemberPayment extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function groceryItem(): BelongsTo
+    {
+        return $this->belongsTo(GroceryItem::class);
     }
 
     public function recorder(): BelongsTo

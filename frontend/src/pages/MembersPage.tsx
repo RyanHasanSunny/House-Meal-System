@@ -123,22 +123,17 @@ export function MembersPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading
-        title="Members & Roles"
-        copy="Members are added here, and the current admin can hand weekly admin responsibility to another active member."
-      />
+      <SectionHeading title="Members & Roles" />
 
       <Card>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Current Weekly Admin</p>
-            <h2 className="mt-2 text-2xl font-bold">{currentAdmin ? currentAdmin.name : 'No admin assigned'}</h2>
-            <p className="mt-2 text-sm text-stone-600">
-              {currentAdmin ? `@${currentAdmin.username}` : 'Use the transfer action below to assign the admin role.'}
-            </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Current Weekly Admin</p>
+              <h2 className="mt-2 text-2xl font-bold">{currentAdmin ? currentAdmin.name : 'No admin assigned'}</h2>
+              {currentAdmin ? <p className="mt-2 text-sm text-stone-600">@{currentAdmin.username}</p> : null}
+            </div>
+            {currentAdmin ? <Badge variant="accent">Active house admin</Badge> : null}
           </div>
-          {currentAdmin ? <Badge variant="accent">Active house admin</Badge> : null}
-        </div>
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -149,7 +144,6 @@ export function MembersPage() {
             </div>
             <div>
               <h2 className="text-2xl font-bold">Add User</h2>
-              <p className="mt-1 text-sm text-stone-600">Admins can add members. Super admins can also add admins.</p>
             </div>
           </div>
 
@@ -251,16 +245,13 @@ export function MembersPage() {
                 </div>
               </Card>
             ))
-          ) : (
-            <EmptyState icon={Users} title="No users found" copy="Create the first house member to start tracking meals." />
-          )}
+          ) : <EmptyState icon={Users} title="No users found" />}
         </div>
       </div>
 
       {members.length ? (
         <Card>
           <h2 className="text-2xl font-bold">Transfer Candidates</h2>
-          <p className="mt-2 text-sm text-stone-600">Only active members can receive the weekly admin role.</p>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {members.map((member) => (
               <div key={member.id} className="rounded-[22px] border border-stone-200 bg-stone-50 p-4">

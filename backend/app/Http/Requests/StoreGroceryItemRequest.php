@@ -15,8 +15,10 @@ class StoreGroceryItemRequest extends FormRequest
     {
         return [
             'meal_plan_id' => ['required', 'integer', 'exists:meal_plans,id'],
-            'grocery_catalog_item_id' => ['required', 'integer', 'exists:grocery_catalog_items,id'],
+            'grocery_catalog_item_id' => ['nullable', 'integer', 'exists:grocery_catalog_items,id'],
+            'title' => ['nullable', 'string', 'max:255', 'required_without:grocery_catalog_item_id'],
             'quantity' => ['required', 'numeric', 'min:0.01'],
+            'unit' => ['required', 'string', 'max:30'],
             'price' => ['required', 'numeric', 'min:0'],
             'purchased_on' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:1000'],

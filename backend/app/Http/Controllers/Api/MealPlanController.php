@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\DeleteMealPlanRequest;
 use App\Http\Requests\StoreMealPlanRequest;
+use App\Models\MemberPayment;
 use App\Models\MealPlan;
 use App\Models\User;
 use App\Services\MealStatusService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MealPlanController extends Controller
 {
@@ -61,9 +64,24 @@ class MealPlanController extends Controller
         abort(405);
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(DeleteMealPlanRequest $request, MealPlan $mealPlan): JsonResponse
     {
-        abort(405);
+        DB::transaction(function () use ($mealPlan): void {
+            $groceryItemIds = $mealPlan->groceryItems()->pluck('id');
+
+            if ($groceryItemIds->isNotEmpty()) {
+                MemberPayment::query()
+                    ->whereIn('grocery_item_id', $groceryItemIds)
+                    ->delete();
+            }
+
+            $mealPlan->groceryItems()->delete();
+            $mealPlan->delete();
+        });
+
+        return response()->json([
+            'message' => 'Meal plan deleted successfully.',
+        ]);
     }
 
     public function active(MealStatusService $mealStatusService): JsonResponse

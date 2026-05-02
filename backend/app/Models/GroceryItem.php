@@ -9,6 +9,7 @@ class GroceryItem extends Model
 {
     protected $fillable = [
         'meal_plan_id',
+        'member_id',
         'grocery_catalog_item_id',
         'title',
         'category',
@@ -42,5 +43,10 @@ class GroceryItem extends Model
     public function catalogItem(): BelongsTo
     {
         return $this->belongsTo(GroceryCatalogItem::class, 'grocery_catalog_item_id');
+    }
+
+    public function member(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'member_id');
     }
 }

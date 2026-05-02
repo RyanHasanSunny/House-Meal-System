@@ -1,4 +1,4 @@
-# House Meal System
+# Gaabai khai
 
 Full-stack bachelor house meal management system with:
 
@@ -19,7 +19,7 @@ Full-stack bachelor house meal management system with:
 ## Project Structure
 
 ```text
-House Meal System/
+Gaabai khai/
 |-- backend/
 |   |-- app/
 |   |   |-- Enums/
@@ -74,6 +74,82 @@ npm run dev
 ```
 
 Frontend runs on `http://localhost:5173`.
+
+## cPanel Deployment
+
+Recommended structure:
+
+- frontend static app on `public_html`
+- Laravel API on a subdomain such as `api.yourdomain.com`
+- point the API subdomain document root to `backend/public`
+
+### 1. Build the frontend for production
+
+```bash
+cd frontend
+copy .env.production.example .env.production
+```
+
+Set:
+
+- `VITE_API_BASE_URL=https://api.yourdomain.com/api`
+- `VITE_APP_BASE=/`
+
+Then build:
+
+```bash
+npm install --include=dev
+npm run build
+```
+
+Upload the contents of `frontend/dist/` to `public_html/`.
+
+Important:
+
+- `frontend/public/.htaccess` is included for SPA route fallback on cPanel
+- this prevents refreshes on routes like `/settings` or `/meals` from breaking
+
+### 2. Deploy the Laravel backend
+
+Upload `backend/` to your hosting account outside `public_html` if possible.
+
+Point the API subdomain document root to:
+
+```text
+backend/public
+```
+
+Then inside `backend/`:
+
+```bash
+php ../composer.phar install --no-dev --optimize-autoloader
+copy .env.cpanel.example .env
+php artisan key:generate
+php artisan migrate --force
+php artisan optimize
+```
+
+Update `.env` with your real:
+
+- MySQL database credentials
+- `APP_URL`
+- `FRONTEND_URL`
+
+### 3. Required cPanel notes
+
+- make sure PHP version is `8.3+`
+- enable MySQL for Laravel
+- if your host supports Terminal, run the Laravel commands there
+- if Terminal is not available, use cPanel cron jobs or a one-time SSH session for `migrate --force` and `optimize`
+- make sure `storage/` and `bootstrap/cache/` are writable
+
+### 4. Production URLs
+
+Example:
+
+- frontend: `https://yourdomain.com`
+- backend API: `https://api.yourdomain.com`
+- login endpoint: `https://api.yourdomain.com/api/auth/login`
 
 ## Demo Accounts
 

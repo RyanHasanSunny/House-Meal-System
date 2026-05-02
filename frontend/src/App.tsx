@@ -4,11 +4,9 @@ import { Spinner } from './components/ui/Spinner'
 import { useAuth } from './providers/AuthProvider'
 import { DashboardPage } from './pages/DashboardPage'
 import { FinanceSummaryPage } from './pages/FinanceSummaryPage'
-import { GroceriesPage } from './pages/GroceriesPage'
 import { LoginPage } from './pages/LoginPage'
-import { MealPlansPage } from './pages/MealPlansPage'
 import { MealsPage } from './pages/MealsPage'
-import { MembersPage } from './pages/MembersPage'
+import { SettingsPage } from './pages/SettingsPage'
 import type { Role } from './types'
 
 function ProtectedRoute() {
@@ -17,7 +15,7 @@ function ProtectedRoute() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Spinner label="Loading House Meal System..." />
+        <Spinner label="Loading Gaabai khai..." />
       </div>
     )
   }
@@ -77,11 +75,12 @@ export default function App() {
         <Route path="/" element={<ProtectedRoute />}>
           <Route index element={<DashboardPage />} />
           <Route path="meals" element={<MealsPage />} />
+          <Route path="finance-summary" element={<FinanceSummaryPage />} />
           <Route element={<RoleRoute roles={['super_admin', 'admin']} />}>
-            <Route path="finance-summary" element={<FinanceSummaryPage />} />
-            <Route path="groceries" element={<GroceriesPage />} />
-            <Route path="users" element={<MembersPage />} />
-            <Route path="meal-plans" element={<MealPlansPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="groceries" element={<Navigate replace to="/settings?tab=groceries" />} />
+            <Route path="users" element={<Navigate replace to="/settings?tab=members" />} />
+            <Route path="meal-plans" element={<Navigate replace to="/settings?tab=meal-plans" />} />
           </Route>
         </Route>
 

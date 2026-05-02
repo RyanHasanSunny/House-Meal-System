@@ -5,24 +5,95 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
+import { Select } from '../components/ui/Select'
 import { SectionHeading } from '../components/ui/SectionHeading'
 import { Spinner } from '../components/ui/Spinner'
 import { formatDate } from '../lib/format'
-import type { MealStatus, MealStatusMeta } from '../types'
+import { useAuth } from '../providers/AuthProvider'
+import type { MealStatus, MealStatusMeta, User } from '../types'
+
+const LUNCH_CUTOFF_HOUR = 14
+const DINNER_CUTOFF_HOUR = 21
+
+function getDhakaDateParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Dhaka',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+  })
+
+  const parts = formatter.formatToParts(date)
+
+  return {
+    year: Number(parts.find((part) => part.type === 'year')?.value ?? '0'),
+    month: Number(parts.find((part) => part.type === 'month')?.value ?? '0'),
+    day: Number(parts.find((part) => part.type === 'day')?.value ?? '0'),
+    hour: Number(parts.find((part) => part.type === 'hour')?.value ?? '0'),
+  }
+}
+
+function isMealEditableLocally(mealDate: string, meal: 'lunch' | 'dinner', now: Date) {
+  const current = getDhakaDateParts(now)
+  const [year, month, day] = mealDate.split('-').map(Number)
+  const currentDateKey = current.year * 10_000 + current.month * 100 + current.day
+  const mealDateKey = year * 10_000 + month * 100 + day
+
+  if (mealDateKey > currentDateKey) {
+    return true
+  }
+
+  if (mealDateKey < currentDateKey) {
+    return false
+  }
+
+  const cutoffHour = meal === 'lunch' ? LUNCH_CUTOFF_HOUR : DINNER_CUTOFF_HOUR
+
+  return current.hour < cutoffHour
+}
 
 export function MealsPage() {
+  const { user } = useAuth()
   const [statuses, setStatuses] = useState<MealStatus[]>([])
   const [meta, setMeta] = useState<MealStatusMeta | null>(null)
+  const [members, setMembers] = useState<User[]>([])
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [savingId, setSavingId] = useState<number | null>(null)
+  const [now, setNow] = useState(() => new Date())
+
+  const canManageMemberMeals = user?.role === 'super_admin'
+
+  async function loadStatuses(userId?: number) {
+    const response = await api.get<{ data: MealStatus[]; meta: MealStatusMeta }>('/meal-statuses', {
+      params: userId ? { user_id: userId } : undefined,
+    })
+
+    setStatuses(response.data.data)
+    setMeta(response.data.meta)
+  }
 
   useEffect(() => {
-    async function loadStatuses() {
+    async function bootstrap() {
+      setError('')
+
       try {
-        const response = await api.get<{ data: MealStatus[]; meta: MealStatusMeta }>('/meal-statuses')
-        setStatuses(response.data.data)
-        setMeta(response.data.meta)
+        if (canManageMemberMeals) {
+          const response = await api.get<{ data: User[] }>('/users')
+          const memberOptions = response.data.data.filter((entry) => entry.role === 'member')
+
+          setMembers(memberOptions)
+          setSelectedUserId(user?.id ?? null)
+          await loadStatuses(user?.id)
+        } else {
+          setMembers([])
+          setSelectedUserId(null)
+          await loadStatuses()
+        }
       } catch (loadError) {
         setError(getApiErrorMessage(loadError))
       } finally {
@@ -30,11 +101,35 @@ export function MealsPage() {
       }
     }
 
-    void loadStatuses()
+    void bootstrap()
+  }, [canManageMemberMeals, user?.id])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date())
+    }, 30_000)
+
+    return () => window.clearInterval(timer)
   }, [])
+
+  async function handleSelectedUserChange(nextUserId: number) {
+    setError('')
+    setMessage('')
+    setIsLoading(true)
+    setSelectedUserId(nextUserId)
+
+    try {
+      await loadStatuses(nextUserId === user?.id ? undefined : nextUserId)
+    } catch (loadError) {
+      setError(getApiErrorMessage(loadError))
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   async function toggleMeal(status: MealStatus, field: 'skip_lunch' | 'skip_dinner') {
     setError('')
+    setMessage('')
     setSavingId(status.id)
 
     try {
@@ -43,8 +138,27 @@ export function MealsPage() {
       })
 
       setStatuses((current) => current.map((entry) => (entry.id === status.id ? response.data.data : entry)))
+      setMessage('Meal status updated successfully.')
     } catch (toggleError) {
-      setError(getApiErrorMessage(toggleError))
+      const nextMessage = getApiErrorMessage(toggleError)
+
+      if (nextMessage === 'Lunch skip time has passed.') {
+        setStatuses((current) =>
+          current.map((entry) =>
+            entry.id === status.id ? { ...entry, can_edit_lunch: false, can_edit: entry.can_edit_dinner } : entry
+          )
+        )
+      }
+
+      if (nextMessage === 'Dinner skip time has passed.') {
+        setStatuses((current) =>
+          current.map((entry) =>
+            entry.id === status.id ? { ...entry, can_edit_dinner: false, can_edit: entry.can_edit_lunch } : entry
+          )
+        )
+      }
+
+      setError(nextMessage)
     } finally {
       setSavingId(null)
     }
@@ -58,12 +172,43 @@ export function MealsPage() {
     )
   }
 
+  const viewableUsers = user
+    ? [user, ...members.filter((entry) => entry.id !== user.id)]
+    : []
+
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="My Meals"
-        copy="Only mark the meals you cannot take. Unmarked lunch and dinner stay counted as taken automatically."
+        title={canManageMemberMeals ? 'Meal Statuses' : 'My Meals'}
+        copy={
+          canManageMemberMeals
+            ? 'View your own meals or switch to any member to manage lunch and dinner skips.'
+            : 'Only mark the meals you cannot take. Unmarked lunch and dinner stay counted as taken automatically.'
+        }
       />
+
+      {canManageMemberMeals ? (
+        <Card>
+          <div className="grid gap-4 md:grid-cols-[280px_1fr] md:items-end">
+            <div>
+              <label className="field-label">View Member</label>
+              <Select
+                value={selectedUserId ?? user?.id ?? 0}
+                onChange={(event) => void handleSelectedUserChange(Number(event.target.value))}
+              >
+                {viewableUsers.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.id === user?.id ? `${entry.name} (You)` : `${entry.name} (@${entry.username})`}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="rounded-[22px] border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-stone-700">
+              {meta ? `${meta.selected_user.name} (@${meta.selected_user.username})` : 'Select a member to manage meal statuses.'}
+            </div>
+          </div>
+        </Card>
+      ) : null}
 
       {meta?.meal_plan ? (
         <Card>
@@ -86,71 +231,82 @@ export function MealsPage() {
         </div>
       ) : null}
 
+      {message ? (
+        <div className="rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
+          {message}
+        </div>
+      ) : null}
+
       {statuses.length ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {statuses.map((status) => (
-            <Card key={status.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-stone-500">{formatDate(status.meal_date)}</p>
-                  <h2 className="mt-2 text-xl font-bold text-ink-950">{status.meal_date}</h2>
-                </div>
-                <Badge variant={status.skip_lunch || status.skip_dinner ? 'accent' : 'brand'}>
-                  {status.skip_lunch || status.skip_dinner ? 'Custom status' : 'All taken'}
-                </Badge>
-              </div>
+          {statuses.map((status) => {
+            const canEditLunch = status.can_edit_lunch && isMealEditableLocally(status.meal_date, 'lunch', now)
+            const canEditDinner = status.can_edit_dinner && isMealEditableLocally(status.meal_date, 'dinner', now)
 
-              <div className="mt-5 grid gap-3">
-                <div className="rounded-[22px] border border-stone-200 bg-stone-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-2xl bg-brand-100 p-2 text-brand-700">
-                        <Soup className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-ink-950">Lunch</p>
-                        <p className="text-sm text-stone-500">{status.skip_lunch ? 'Marked as skipped' : 'Counted as taken'}</p>
-                      </div>
-                    </div>
-                    <Button
-                      disabled={!status.can_edit || savingId === status.id}
-                      variant={status.skip_lunch ? 'danger' : 'ghost'}
-                      onClick={() => toggleMeal(status, 'skip_lunch')}
-                    >
-                      {status.skip_lunch ? 'Undo Skip' : 'Skip Lunch'}
-                    </Button>
+            return (
+              <Card key={status.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-stone-500">{formatDate(status.meal_date)}</p>
+                    <h2 className="mt-2 text-xl font-bold text-ink-950">{status.meal_date}</h2>
                   </div>
+                  <Badge variant={status.skip_lunch || status.skip_dinner ? 'accent' : 'brand'}>
+                    {status.skip_lunch || status.skip_dinner ? 'Custom status' : 'All taken'}
+                  </Badge>
                 </div>
 
-                <div className="rounded-[22px] border border-stone-200 bg-stone-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-2xl bg-accent-100 p-2 text-[#9a5d1d]">
-                        <CalendarCheck2 className="h-4 w-4" />
+                <div className="mt-5 grid gap-3">
+                  <div className="rounded-[22px] border border-stone-200 bg-stone-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-2xl bg-brand-100 p-2 text-brand-700">
+                          <Soup className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-ink-950">Lunch</p>
+                          <p className="text-sm text-stone-500">{status.skip_lunch ? 'Marked as skipped' : 'Counted as taken'}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-ink-950">Dinner</p>
-                        <p className="text-sm text-stone-500">{status.skip_dinner ? 'Marked as skipped' : 'Counted as taken'}</p>
-                      </div>
+                      <Button
+                        disabled={!canEditLunch || savingId === status.id}
+                        variant={status.skip_lunch ? 'danger' : 'ghost'}
+                        onClick={() => toggleMeal(status, 'skip_lunch')}
+                      >
+                        {status.skip_lunch ? 'Undo Skip' : 'Skip Lunch'}
+                      </Button>
                     </div>
-                    <Button
-                      disabled={!status.can_edit || savingId === status.id}
-                      variant={status.skip_dinner ? 'danger' : 'ghost'}
-                      onClick={() => toggleMeal(status, 'skip_dinner')}
-                    >
-                      {status.skip_dinner ? 'Undo Skip' : 'Skip Dinner'}
-                    </Button>
+                  </div>
+
+                  <div className="rounded-[22px] border border-stone-200 bg-stone-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-2xl bg-accent-100 p-2 text-[#9a5d1d]">
+                          <CalendarCheck2 className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-ink-950">Dinner</p>
+                          <p className="text-sm text-stone-500">{status.skip_dinner ? 'Marked as skipped' : 'Counted as taken'}</p>
+                        </div>
+                      </div>
+                      <Button
+                        disabled={!canEditDinner || savingId === status.id}
+                        variant={status.skip_dinner ? 'danger' : 'ghost'}
+                        onClick={() => toggleMeal(status, 'skip_dinner')}
+                      >
+                        {status.skip_dinner ? 'Undo Skip' : 'Skip Dinner'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            )
+          })}
         </div>
       ) : (
         <EmptyState
           icon={CalendarCheck2}
           title="No meal statuses found"
-          copy="When an admin creates a plan, your daily lunch and dinner entries will appear here automatically."
+          copy={canManageMemberMeals ? 'No meal statuses are available for the selected user.' : undefined}
         />
       )}
     </div>

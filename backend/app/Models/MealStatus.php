@@ -33,4 +33,9 @@ class MealStatus extends Model
     {
         return $this->belongsTo(MealPlan::class);
     }
+
+    public function belongsToUser(User $user): bool
+    {
+        return (string) $this->user_id === (string) $user->getKey();
+    }
 }

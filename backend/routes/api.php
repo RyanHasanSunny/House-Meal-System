@@ -25,6 +25,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     Route::get('/meal-statuses', [MealStatusController::class, 'index']);
     Route::patch('/meal-statuses/{mealStatus}', [MealStatusController::class, 'update']);
+    Route::get('/finance-summary/monthly', [FinanceSummaryController::class, 'monthly']);
 
     Route::get('/groceries', [GroceryItemController::class, 'index']);
     Route::get('/grocery-catalog', [GroceryCatalogController::class, 'index']);
@@ -32,7 +33,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::middleware('role:super_admin,admin')->group(function (): void {
         Route::get('/meal-plans/active', [MealPlanController::class, 'active']);
         Route::apiResource('meal-plans', MealPlanController::class)->only(['index', 'store', 'show']);
-        Route::get('/finance-summary/monthly', [FinanceSummaryController::class, 'monthly']);
 
         Route::apiResource('groceries', GroceryItemController::class)->only(['store', 'update', 'destroy']);
         Route::apiResource('member-payments', MemberPaymentController::class)->only(['store', 'destroy']);
@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     });
 
     Route::middleware('role:super_admin')->group(function (): void {
+        Route::delete('/meal-plans/{mealPlan}', [MealPlanController::class, 'destroy']);
         Route::apiResource('grocery-catalog', GroceryCatalogController::class)->only(['store', 'update', 'destroy']);
     });
 });

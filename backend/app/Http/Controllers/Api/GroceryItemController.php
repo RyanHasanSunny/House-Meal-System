@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateGroceryItemRequest;
 use App\Models\GroceryCatalogItem;
 use App\Models\GroceryItem;
 use App\Models\MealPlan;
+use App\Models\MemberPayment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,7 +19,7 @@ class GroceryItemController extends Controller
         $mealPlan = $this->resolveMealPlan($request);
 
         $groceries = GroceryItem::query()
-            ->with(['addedBy:id,name,username', 'mealPlan:id,name,type,start_date,end_date', 'catalogItem:id,name,category,default_unit'])
+            ->with(['addedBy:id,name,username', 'member:id,name,username', 'mealPlan:id,name,type,start_date,end_date', 'catalogItem:id,name,category,default_unit'])
             ->when($mealPlan, fn ($query) => $query->where('meal_plan_id', $mealPlan->id))
             ->orderByDesc('purchased_on')
             ->orderByDesc('id')
@@ -36,20 +37,34 @@ class GroceryItemController extends Controller
 
     public function store(StoreGroceryItemRequest $request): JsonResponse
     {
-        $catalogItem = GroceryCatalogItem::query()
-            ->whereKey($request->integer('grocery_catalog_item_id'))
-            ->where('is_active', true)
-            ->firstOrFail();
+        $actor = $request->user();
+        $catalogItem = null;
+        if ($request->filled('grocery_catalog_item_id')) {
+            $catalogItem = GroceryCatalogItem::query()
+                ->whereKey($request->integer('grocery_catalog_item_id'))
+                ->where('is_active', true)
+                ->firstOrFail();
+        }
 
         $item = GroceryItem::query()->create([
             ...$request->validated(),
-            'title' => $catalogItem->name,
-            'category' => $catalogItem->category,
-            'unit' => $catalogItem->default_unit,
-            'added_by' => $request->user()->id,
+            'member_id' => $actor->id,
+            'title' => $catalogItem?->name ?? (string) $request->string('title'),
+            'category' => $catalogItem?->category,
+            'unit' => $request->string('unit')->value(),
+            'added_by' => $actor->id,
         ]);
 
-        $item->load(['addedBy:id,name,username', 'mealPlan:id,name,type,start_date,end_date', 'catalogItem:id,name,category,default_unit']);
+        MemberPayment::query()->create([
+            'user_id' => $item->member_id,
+            'grocery_item_id' => $item->id,
+            'amount' => $item->price,
+            'paid_on' => $item->purchased_on,
+            'notes' => 'Grocery: ' . $item->title . ($item->notes ? ' - ' . $item->notes : ''),
+            'recorded_by' => $actor->id,
+        ]);
+
+        $item->load(['addedBy:id,name,username', 'member:id,name,username', 'mealPlan:id,name,type,start_date,end_date', 'catalogItem:id,name,category,default_unit']);
 
         return response()->json([
             'message' => 'Grocery item added successfully.',
@@ -66,7 +81,7 @@ class GroceryItemController extends Controller
     {
         $payload = $request->validated();
 
-        if (isset($payload['grocery_catalog_item_id'])) {
+        if (array_key_exists('grocery_catalog_item_id', $payload) && filled($payload['grocery_catalog_item_id'])) {
             $catalogItem = GroceryCatalogItem::query()
                 ->whereKey($payload['grocery_catalog_item_id'])
                 ->where('is_active', true)
@@ -74,11 +89,29 @@ class GroceryItemController extends Controller
 
             $payload['title'] = $catalogItem->name;
             $payload['category'] = $catalogItem->category;
-            $payload['unit'] = $catalogItem->default_unit;
+        }
+
+        if (array_key_exists('grocery_catalog_item_id', $payload) && blank($payload['grocery_catalog_item_id'])) {
+            $payload['grocery_catalog_item_id'] = null;
+            $payload['category'] = null;
         }
 
         $grocery->fill($payload)->save();
-        $grocery->load(['addedBy:id,name,username', 'mealPlan:id,name,type,start_date,end_date', 'catalogItem:id,name,category,default_unit']);
+
+        $payment = MemberPayment::query()
+            ->where('grocery_item_id', $grocery->id)
+            ->first();
+
+        if ($payment) {
+            $payment->update([
+                'user_id' => $grocery->member_id,
+                'amount' => $grocery->price,
+                'paid_on' => $grocery->purchased_on,
+                'notes' => 'Grocery: ' . $grocery->title . ($grocery->notes ? ' - ' . $grocery->notes : ''),
+            ]);
+        }
+
+        $grocery->load(['addedBy:id,name,username', 'member:id,name,username', 'mealPlan:id,name,type,start_date,end_date', 'catalogItem:id,name,category,default_unit']);
 
         return response()->json([
             'message' => 'Grocery item updated successfully.',
@@ -88,6 +121,8 @@ class GroceryItemController extends Controller
 
     public function destroy(GroceryItem $grocery): JsonResponse
     {
+        MemberPayment::query()->where('grocery_item_id', $grocery->id)->delete();
+
         $grocery->delete();
 
         return response()->json([
@@ -100,6 +135,13 @@ class GroceryItemController extends Controller
         return [
             'id' => $item->id,
             'meal_plan' => $item->mealPlan ? $this->planPayload($item->mealPlan) : null,
+            'member' => $item->member
+                ? [
+                    'id' => $item->member->id,
+                    'name' => $item->member->name,
+                    'username' => $item->member->username,
+                ]
+                : null,
             'catalog_item' => $item->catalogItem
                 ? [
                     'id' => $item->catalogItem->id,

@@ -55,12 +55,9 @@ export function DashboardPage() {
 
     return (
       <div className="space-y-6">
-        <SectionHeading
-          title="Your Meal Overview"
-          copy="If you do not mark a meal as skipped, the system counts it as taken by default."
-        />
+        <SectionHeading title="Your Meal Overview" />
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
           <MetricCard icon={CalendarClock} label="Lunch Taken" value={memberDashboard.summary.taken_lunches} />
           <MetricCard icon={CalendarClock} label="Dinner Taken" tone="accent" value={memberDashboard.summary.taken_dinners} />
           <MetricCard icon={Activity} label="Lunch Skipped" tone="neutral" value={memberDashboard.summary.skipped_lunches} />
@@ -74,11 +71,11 @@ export function DashboardPage() {
               <h2 className="mt-2 text-2xl font-bold">
                 {memberDashboard.active_plan ? memberDashboard.active_plan.name : 'No active plan'}
               </h2>
-              <p className="mt-2 text-sm text-stone-600">
-                {memberDashboard.active_plan
-                  ? `${formatDate(memberDashboard.active_plan.start_date)} to ${formatDate(memberDashboard.active_plan.end_date)}`
-                  : 'Ask the admin to create a new meal plan.'}
-              </p>
+              {memberDashboard.active_plan ? (
+                <p className="mt-2 text-sm text-stone-600">
+                  {formatDate(memberDashboard.active_plan.start_date)} to {formatDate(memberDashboard.active_plan.end_date)}
+                </p>
+              ) : null}
             </div>
             {memberDashboard.active_plan ? <Badge variant="brand">{memberDashboard.active_plan.type}</Badge> : null}
           </div>
@@ -88,7 +85,6 @@ export function DashboardPage() {
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold">Upcoming Days</h2>
-              <p className="mt-2 text-sm text-stone-600">Review your next meal decisions quickly.</p>
             </div>
           </div>
 
@@ -126,12 +122,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading
-        title="Operations Dashboard"
-        copy="Track house membership, meal demand, grocery cost, and the currently active plan from one place."
-      />
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <MetricCard icon={Users2} label="Members" value={adminDashboard.counts.members} />
         <MetricCard icon={Users2} label="Admins" tone="neutral" value={adminDashboard.counts.admins} />
         <MetricCard icon={CalendarClock} label="Today's Meals" tone="accent" value={adminDashboard.today.total_meals} />
@@ -143,16 +134,16 @@ export function DashboardPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Active Plan</p>
-              <h2 className="mt-2 text-2xl font-bold">
+              <h2 className="mt-2 text-xl font-bold sm:text-2xl">
                 {adminDashboard.active_plan ? adminDashboard.active_plan.name : 'No active meal plan'}
               </h2>
-              <p className="mt-2 text-sm text-stone-600">
+              <p className="mt-1 text-sm text-stone-600">
                 {adminDashboard.active_plan
                   ? `${formatDate(adminDashboard.active_plan.start_date)} to ${formatDate(adminDashboard.active_plan.end_date)}`
-                  : 'Create a weekly, monthly, or custom plan to begin meal tracking.'}
+                  : ''}
               </p>
               {adminDashboard.current_admin ? (
-                <p className="mt-2 text-sm text-stone-500">
+                <p className="mt-1 text-sm text-stone-500">
                   Current admin: {adminDashboard.current_admin.name} (@{adminDashboard.current_admin.username})
                 </p>
               ) : null}
@@ -161,26 +152,26 @@ export function DashboardPage() {
           </div>
 
           {adminDashboard.active_plan ? (
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
               <div className="panel-soft p-4">
                 <p className="text-sm text-stone-500">Tracked Members</p>
-                <p className="mt-2 text-2xl font-bold">{adminDashboard.active_plan.summary.member_count}</p>
+                <p className="mt-1 text-xl font-bold sm:text-2xl">{adminDashboard.active_plan.summary.member_count}</p>
               </div>
               <div className="panel-soft p-4">
                 <p className="text-sm text-stone-500">Lunch Count</p>
-                <p className="mt-2 text-2xl font-bold">{adminDashboard.active_plan.summary.totals.taken_lunches}</p>
+                <p className="mt-1 text-xl font-bold sm:text-2xl">{adminDashboard.active_plan.summary.totals.taken_lunches}</p>
               </div>
               <div className="panel-soft p-4">
                 <p className="text-sm text-stone-500">Dinner Count</p>
-                <p className="mt-2 text-2xl font-bold">{adminDashboard.active_plan.summary.totals.taken_dinners}</p>
+                <p className="mt-1 text-xl font-bold sm:text-2xl">{adminDashboard.active_plan.summary.totals.taken_dinners}</p>
               </div>
               <div className="panel-soft p-4">
                 <p className="text-sm text-stone-500">Plan Grocery Spend</p>
-                <p className="mt-2 text-2xl font-bold">{formatCurrency(adminDashboard.active_plan.grocery_total_spend)}</p>
+                <p className="mt-1 text-xl font-bold sm:text-2xl">{formatCurrency(adminDashboard.active_plan.grocery_total_spend)}</p>
               </div>
               <div className="panel-soft p-4">
                 <p className="text-sm text-stone-500">Plan Grocery Items</p>
-                <p className="mt-2 text-2xl font-bold">{adminDashboard.active_plan.grocery_items_count}</p>
+                <p className="mt-1 text-xl font-bold sm:text-2xl">{adminDashboard.active_plan.grocery_items_count}</p>
               </div>
             </div>
           ) : null}
@@ -188,7 +179,6 @@ export function DashboardPage() {
 
         <Card>
           <h2 className="text-2xl font-bold">Recent Grocery Items</h2>
-          <p className="mt-2 text-sm text-stone-600">Latest cost entries added by the house team.</p>
           <div className="mt-5 space-y-3">
             {adminDashboard.groceries.recent.map((item) => (
               <div key={item.id} className="rounded-[22px] border border-stone-200 bg-stone-50 px-4 py-4">
@@ -212,9 +202,6 @@ export function DashboardPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-2xl font-bold">Member Breakdown</h2>
-              <p className="mt-2 text-sm text-stone-600">
-                Every unmarked meal remains counted as taken inside the selected plan.
-              </p>
             </div>
             <Badge variant="brand">{adminDashboard.active_plan.summary.tracked_days} tracked days</Badge>
           </div>
@@ -231,16 +218,47 @@ export function DashboardPage() {
 
             <div className="divide-y divide-stone-200 bg-white">
               {adminDashboard.active_plan.summary.members.map((member) => (
-                <div key={member.user.id} className="grid gap-3 px-4 py-4 md:grid-cols-[1.6fr_repeat(5,0.8fr)] md:items-center">
-                  <div>
-                    <p className="font-semibold text-ink-950">{member.user.name}</p>
-                    <p className="text-sm text-stone-500">@{member.user.username}</p>
+                <div key={member.user.id} className="px-4 py-4">
+                  <div className="md:hidden">
+                    <div>
+                      <p className="font-semibold text-ink-950">{member.user.name}</p>
+                      <p className="text-sm text-stone-500">@{member.user.username}</p>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Lunch</p>
+                        <p className="mt-1 text-lg font-bold text-ink-950">{member.taken_lunches}</p>
+                      </div>
+                      <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Lunch Skip</p>
+                        <p className="mt-1 text-lg font-bold text-ink-950">{member.skipped_lunches}</p>
+                      </div>
+                      <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Dinner</p>
+                        <p className="mt-1 text-lg font-bold text-ink-950">{member.taken_dinners}</p>
+                      </div>
+                      <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Dinner Skip</p>
+                        <p className="mt-1 text-lg font-bold text-ink-950">{member.skipped_dinners}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-2xl bg-brand-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Total</p>
+                      <p className="mt-1 text-xl font-bold text-ink-950">{member.taken_meals}</p>
+                    </div>
                   </div>
-                  <p className="text-sm font-medium text-stone-700 md:text-base">{member.taken_lunches}</p>
-                  <p className="text-sm font-medium text-stone-700 md:text-base">{member.skipped_lunches}</p>
-                  <p className="text-sm font-medium text-stone-700 md:text-base">{member.taken_dinners}</p>
-                  <p className="text-sm font-medium text-stone-700 md:text-base">{member.skipped_dinners}</p>
-                  <p className="text-sm font-bold text-ink-950 md:text-base">{member.taken_meals}</p>
+
+                  <div className="hidden gap-3 md:grid md:grid-cols-[1.6fr_repeat(5,0.8fr)] md:items-center">
+                    <div>
+                      <p className="font-semibold text-ink-950">{member.user.name}</p>
+                      <p className="text-sm text-stone-500">@{member.user.username}</p>
+                    </div>
+                    <p className="text-sm font-medium text-stone-700 md:text-base">{member.taken_lunches}</p>
+                    <p className="text-sm font-medium text-stone-700 md:text-base">{member.skipped_lunches}</p>
+                    <p className="text-sm font-medium text-stone-700 md:text-base">{member.taken_dinners}</p>
+                    <p className="text-sm font-medium text-stone-700 md:text-base">{member.skipped_dinners}</p>
+                    <p className="text-sm font-bold text-ink-950 md:text-base">{member.taken_meals}</p>
+                  </div>
                 </div>
               ))}
             </div>
