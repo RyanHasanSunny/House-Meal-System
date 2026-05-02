@@ -128,6 +128,8 @@ class FinanceSummaryTest extends TestCase
             ->assertJsonPath('data.totals.total_paid', 650)
             ->assertJsonPath('data.totals.total_due', 400)
             ->assertJsonCount(2, 'data.members')
+            ->assertJsonCount(2, 'data.groceries')
+            ->assertJsonPath('data.groceries.0.title', 'Rice')
             ->assertJsonCount(2, 'data.payments');
 
         $members = collect($response->json('data.members'))->keyBy('user.username');
@@ -204,6 +206,111 @@ class FinanceSummaryTest extends TestCase
         $this->getJson('/api/finance-summary/monthly?month=2026-06')
             ->assertOk()
             ->assertJsonPath('data.totals.total_gross', 240)
-            ->assertJsonCount(2, 'data.members');
+            ->assertJsonCount(2, 'data.members')
+            ->assertJsonCount(1, 'data.groceries')
+            ->assertJsonPath('data.groceries.0.title', 'Lentils');
+    }
+
+    public function test_monthly_summary_rolls_advance_forward_until_used(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Advance Admin',
+            'username' => 'advance-admin',
+            'email' => 'advance-admin@example.com',
+            'role' => UserRole::Admin->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => '2026-05-01',
+        ]);
+
+        $member = User::query()->create([
+            'name' => 'Advance Member',
+            'username' => 'advance-member',
+            'email' => 'advance-member@example.com',
+            'role' => UserRole::Member->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => '2026-05-01',
+        ]);
+
+        $mayPlan = MealPlan::query()->create([
+            'name' => 'May End Plan',
+            'type' => 'custom',
+            'start_date' => '2026-05-31',
+            'end_date' => '2026-05-31',
+            'notes' => null,
+            'created_by' => $admin->id,
+        ]);
+
+        $junePlan = MealPlan::query()->create([
+            'name' => 'June Start Plan',
+            'type' => 'custom',
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-01',
+            'notes' => null,
+            'created_by' => $admin->id,
+        ]);
+
+        app(MealStatusService::class)->syncStatusesForPlan($mayPlan);
+        app(MealStatusService::class)->syncStatusesForPlan($junePlan);
+
+        MealStatus::query()
+            ->where('user_id', $member->id)
+            ->whereDate('meal_date', '2026-05-31')
+            ->update(['skip_dinner' => true]);
+
+        GroceryItem::query()->create([
+            'meal_plan_id' => $mayPlan->id,
+            'grocery_catalog_item_id' => null,
+            'title' => 'May Rice',
+            'category' => 'Staples',
+            'quantity' => 5,
+            'unit' => 'kg',
+            'price' => 300,
+            'purchased_on' => '2026-05-31',
+            'notes' => null,
+            'added_by' => $admin->id,
+        ]);
+
+        GroceryItem::query()->create([
+            'meal_plan_id' => $junePlan->id,
+            'grocery_catalog_item_id' => null,
+            'title' => 'June Rice',
+            'category' => 'Staples',
+            'quantity' => 6,
+            'unit' => 'kg',
+            'price' => 400,
+            'purchased_on' => '2026-06-01',
+            'notes' => null,
+            'added_by' => $admin->id,
+        ]);
+
+        MemberPayment::query()->create([
+            'user_id' => $member->id,
+            'grocery_item_id' => null,
+            'amount' => 200,
+            'paid_on' => '2026-05-31',
+            'notes' => 'Advance from May',
+            'recorded_by' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->getJson('/api/finance-summary/monthly?month=2026-06');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.totals.meal_rate', 100)
+            ->assertJsonPath('data.totals.total_paid', 0);
+
+        $members = collect($response->json('data.members'))->keyBy('user.username');
+
+        $this->assertSame(2, $members['advance-member']['taken_meals']);
+        $this->assertEquals(200.0, $members['advance-member']['payable_amount']);
+        $this->assertEquals(0.0, $members['advance-member']['paid_amount']);
+        $this->assertEquals(100.0, $members['advance-member']['carried_advance_amount']);
+        $this->assertEquals(100.0, $members['advance-member']['advance_used_amount']);
+        $this->assertEquals(100.0, $members['advance-member']['due_amount']);
+        $this->assertEquals(0.0, $members['advance-member']['advance_amount']);
     }
 }

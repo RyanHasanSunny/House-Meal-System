@@ -199,6 +199,9 @@ export interface MemberDashboardData {
     skipped_lunches: number
     taken_dinners: number
     skipped_dinners: number
+    taken_meals: number
+    meal_rate: number
+    meal_cost: number
     upcoming_skips: number
   }
   upcoming: Array<{
@@ -233,6 +236,20 @@ export interface MonthlyFinanceSummary {
     payable_amount: number
     due_amount: number
     advance_amount: number
+    carried_advance_amount: number
+    advance_used_amount: number
+  }>
+  groceries: Array<{
+    id: number
+    title: string
+    category: string | null
+    quantity: number
+    unit: string | null
+    price: number
+    purchased_on: string
+    notes: string | null
+    member: Pick<User, 'id' | 'name' | 'username'> | null
+    added_by: Pick<User, 'id' | 'name' | 'username'> | null
   }>
   payments: Array<{
     id: number

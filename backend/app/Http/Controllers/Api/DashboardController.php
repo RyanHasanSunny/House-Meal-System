@@ -48,6 +48,21 @@ class DashboardController extends Controller
             ->orderBy('meal_date')
             ->get();
 
+        $planStatuses = $mealPlan
+            ? MealStatus::query()
+                ->where('meal_plan_id', $mealPlan->id)
+                ->get()
+            : collect();
+
+        $takenLunches = $statuses->where('skip_lunch', false)->count();
+        $takenDinners = $statuses->where('skip_dinner', false)->count();
+        $takenMeals = $takenLunches + $takenDinners;
+        $totalPlanMeals = $planStatuses->where('skip_lunch', false)->count() + $planStatuses->where('skip_dinner', false)->count();
+        $mealRate = $mealPlan && $totalPlanMeals > 0
+            ? round((float) $mealPlan->groceryItems()->sum('price') / $totalPlanMeals, 2)
+            : 0.0;
+        $mealCost = round($mealRate * $takenMeals, 2);
+
         return [
             'active_plan' => $mealPlan
                 ? [
@@ -59,10 +74,13 @@ class DashboardController extends Controller
                 ]
                 : null,
             'summary' => [
-                'taken_lunches' => $statuses->where('skip_lunch', false)->count(),
+                'taken_lunches' => $takenLunches,
                 'skipped_lunches' => $statuses->where('skip_lunch', true)->count(),
-                'taken_dinners' => $statuses->where('skip_dinner', false)->count(),
+                'taken_dinners' => $takenDinners,
                 'skipped_dinners' => $statuses->where('skip_dinner', true)->count(),
+                'taken_meals' => $takenMeals,
+                'meal_rate' => $mealRate,
+                'meal_cost' => $mealCost,
                 'upcoming_skips' => $statuses
                     ->filter(fn (MealStatus $status) => $status->meal_date->gte(today()) && ($status->skip_lunch || $status->skip_dinner))
                     ->count(),

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /finance-summary
+Disallow: /meals
+Disallow: /settings
+Disallow: /groceries
+Disallow: /users
+Disallow: /meal-plans
+
+Sitemap: https://gaabai.online/sitemap.xml

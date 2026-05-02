@@ -10,7 +10,7 @@ const navigation = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['super_admin', 'admin', 'member'] as Role[] },
   { to: '/meals', label: 'My Meals', icon: CalendarCheck2, roles: ['super_admin', 'admin', 'member'] as Role[] },
   { to: '/finance-summary', label: 'Summary', icon: ReceiptText, roles: ['super_admin', 'admin', 'member'] as Role[] },
-  { to: '/settings', label: 'Settings', icon: Settings2, roles: ['super_admin', 'admin'] as Role[] },
+  { to: '/settings', label: 'Settings', icon: Settings2, roles: ['super_admin', 'admin', 'member'] as Role[] },
 ]
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -28,7 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <aside className="panel subtle-grid hidden w-[280px] shrink-0 flex-col p-6 lg:flex">
           <div>
             <div className="rounded-[26px] bg-ink-950 p-5 text-white shadow-[0_18px_40px_-24px_rgba(21,21,22,0.8)]">
-              <h2 className="text-2xl font-bold text-white">Gaabai khai</h2>
+              <h2 className="text-2xl font-bold text-white">GAABAI KHAI</h2>
             </div>
 
             <nav className="mt-6 space-y-2">
@@ -66,6 +66,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col pb-24 lg:pb-0">
+          <header className="mb-4 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-ink-950 p-4 text-white shadow-[0_18px_40px_-24px_rgba(21,21,22,0.8)] lg:hidden">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold tracking-[0.24em] text-white/65">GAABAI KHAI</p>
+              <p className="truncate text-sm text-white/80">@{user.username}</p>
+            </div>
+            <Button
+              className="shrink-0 border-white/10 bg-white text-ink-950 hover:border-white/20 hover:bg-brand-50"
+              variant="ghost"
+              onClick={() => void logout()}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </header>
+
           <main className="flex-1">{children}</main>
 
           <footer className="px-2 pt-8 text-center text-xs leading-6 text-stone-500 sm:px-4">

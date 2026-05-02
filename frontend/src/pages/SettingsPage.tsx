@@ -1,35 +1,41 @@
-import { LogOut, Settings2, ShoppingBasket, ScrollText, Users } from 'lucide-react'
+import { Settings2, ShoppingBasket, ScrollText, UserRound, Users } from 'lucide-react'
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Card } from '../components/ui/Card'
-import { Button } from '../components/ui/Button'
 import { cn } from '../lib/cn'
 import { useAuth } from '../providers/AuthProvider'
+import { AccountSettingsPage } from './AccountSettingsPage'
 import { GroceriesPage } from './GroceriesPage'
 import { MealPlansPage } from './MealPlansPage'
 import { MembersPage } from './MembersPage'
 
-const tabs = [
+const adminTabs = [
   { key: 'groceries', label: 'Groceries', icon: ShoppingBasket },
   { key: 'meal-plans', label: 'Meal Plans', icon: ScrollText },
   { key: 'members', label: 'Members', icon: Users },
 ] as const
 
-type SettingsTab = (typeof tabs)[number]['key']
+const accountTab = { key: 'account', label: 'Account', icon: UserRound } as const
 
-function isSettingsTab(value: string | null): value is SettingsTab {
+type SettingsTab = 'account' | (typeof adminTabs)[number]['key']
+
+function isSettingsTab(value: string | null, tabs: ReadonlyArray<{ key: SettingsTab }>): value is SettingsTab {
   return tabs.some((tab) => tab.key === value)
 }
 
 export function SettingsPage() {
-  const { logout } = useAuth()
+  const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
+  const tabs = useMemo(
+    () => [accountTab, ...(user?.role === 'member' ? [] : adminTabs)],
+    [user?.role],
+  )
 
   const activeTab = useMemo<SettingsTab>(() => {
     const tab = searchParams.get('tab')
 
-    return isSettingsTab(tab) ? tab : 'groceries'
-  }, [searchParams])
+    return isSettingsTab(tab, tabs) ? tab : 'account'
+  }, [searchParams, tabs])
 
   function handleTabChange(tab: SettingsTab) {
     setSearchParams({ tab })
@@ -69,16 +75,10 @@ export function SettingsPage() {
         </div>
       </Card>
 
+      {activeTab === 'account' ? <AccountSettingsPage /> : null}
       {activeTab === 'groceries' ? <GroceriesPage /> : null}
       {activeTab === 'meal-plans' ? <MealPlansPage /> : null}
       {activeTab === 'members' ? <MembersPage /> : null}
-
-      <Card className="lg:hidden">
-        <Button className="w-full" variant="ghost" onClick={() => void logout()}>
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
-      </Card>
     </div>
   )
 }

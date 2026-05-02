@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return response()->json([
-        'name' => 'Gaabai khai API',
+        'name' => 'GAABAI KHAI API',
         'status' => 'ok',
     ]);
 });

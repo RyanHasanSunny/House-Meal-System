@@ -15,7 +15,7 @@ function ProtectedRoute() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Spinner label="Loading Gaabai khai..." />
+        <Spinner label="Loading GAABAI KHAI..." />
       </div>
     )
   }
@@ -76,8 +76,8 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="meals" element={<MealsPage />} />
           <Route path="finance-summary" element={<FinanceSummaryPage />} />
+          <Route path="settings" element={<SettingsPage />} />
           <Route element={<RoleRoute roles={['super_admin', 'admin']} />}>
-            <Route path="settings" element={<SettingsPage />} />
             <Route path="groceries" element={<Navigate replace to="/settings?tab=groceries" />} />
             <Route path="users" element={<Navigate replace to="/settings?tab=members" />} />
             <Route path="meal-plans" element={<Navigate replace to="/settings?tab=meal-plans" />} />

@@ -1,4 +1,4 @@
-import { BanknoteArrowDown, Calculator, ReceiptText, Trash2, Users2 } from 'lucide-react'
+import { BanknoteArrowDown, Calculator, ReceiptText, ShoppingBasket, Trash2, Users2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { api, getApiErrorMessage } from '../api/client'
@@ -269,21 +269,112 @@ export function FinanceSummaryPage() {
 
           <div className="divide-y divide-stone-200 bg-white">
             {summary.members.map((member) => (
-              <div key={member.user.id} className="grid gap-3 px-4 py-4 lg:grid-cols-[1.4fr_repeat(6,0.9fr)] lg:items-center">
-                <div>
-                  <p className="font-semibold text-ink-950">{member.user.name}</p>
-                  <p className="text-sm text-stone-500">@{member.user.username}</p>
+              <div key={member.user.id} className="px-4 py-4">
+                <div className="lg:hidden">
+                  <div>
+                    <p className="font-semibold text-ink-950">{member.user.name}</p>
+                    <p className="text-sm text-stone-500">@{member.user.username}</p>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Meals</p>
+                      <p className="mt-1 text-lg font-bold text-ink-950">{member.taken_meals}</p>
+                    </div>
+                    <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Meal Cost</p>
+                      <p className="mt-1 text-lg font-bold text-ink-950">{formatCurrency(member.payable_amount)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Paid</p>
+                      <p className="mt-1 text-lg font-bold text-ink-950">{formatCurrency(member.paid_amount)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Need To Pay</p>
+                      <p className="mt-1 text-lg font-bold text-danger-500">{formatCurrency(member.due_amount)}</p>
+                      {member.advance_used_amount > 0 ? (
+                        <p className="mt-1 text-xs text-stone-500">Advance used {formatCurrency(member.advance_used_amount)}</p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-3">
+                    <div className="rounded-2xl bg-brand-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Advance</p>
+                      <p className="mt-1 text-xl font-bold text-brand-700">{formatCurrency(member.advance_amount)}</p>
+                      {member.carried_advance_amount > 0 ? (
+                        <p className="mt-1 text-xs text-stone-500">Brought {formatCurrency(member.carried_advance_amount)}</p>
+                      ) : null}
+                    </div>
+                    <div className="rounded-2xl bg-stone-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Role</p>
+                      <p className="mt-1 font-semibold text-ink-950">{member.user.role_label}</p>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm font-medium text-stone-700 lg:text-base">{member.taken_meals}</p>
-                <p className="text-sm font-medium text-stone-700 lg:text-base">{formatCurrency(member.payable_amount)}</p>
-                <p className="text-sm font-medium text-stone-700 lg:text-base">{formatCurrency(member.paid_amount)}</p>
-                <p className="text-sm font-bold text-danger-500 lg:text-base">{formatCurrency(member.due_amount)}</p>
-                <p className="text-sm font-medium text-brand-700 lg:text-base">{formatCurrency(member.advance_amount)}</p>
-                <p className="text-sm text-stone-600 lg:text-base">{member.user.role_label}</p>
+
+                <div className="hidden gap-3 lg:grid lg:grid-cols-[1.4fr_repeat(6,0.9fr)] lg:items-center">
+                  <div>
+                    <p className="font-semibold text-ink-950">{member.user.name}</p>
+                    <p className="text-sm text-stone-500">@{member.user.username}</p>
+                  </div>
+                  <p className="text-sm font-medium text-stone-700 lg:text-base">{member.taken_meals}</p>
+                  <p className="text-sm font-medium text-stone-700 lg:text-base">{formatCurrency(member.payable_amount)}</p>
+                  <p className="text-sm font-medium text-stone-700 lg:text-base">{formatCurrency(member.paid_amount)}</p>
+                  <div>
+                    <p className="text-sm font-bold text-danger-500 lg:text-base">{formatCurrency(member.due_amount)}</p>
+                    {member.advance_used_amount > 0 ? (
+                      <p className="text-xs text-stone-500">Advance used {formatCurrency(member.advance_used_amount)}</p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-brand-700 lg:text-base">{formatCurrency(member.advance_amount)}</p>
+                    {member.carried_advance_amount > 0 ? (
+                      <p className="text-xs text-stone-500">Brought {formatCurrency(member.carried_advance_amount)}</p>
+                    ) : null}
+                  </div>
+                  <p className="text-sm text-stone-600 lg:text-base">{member.user.role_label}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
+      </Card>
+
+      <Card>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold">Groceries This Month</h2>
+          </div>
+          <Badge variant="brand">{summary.groceries.length} items</Badge>
+        </div>
+
+        {summary.groceries.length ? (
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            {summary.groceries.map((item) => (
+              <div key={item.id} className="rounded-[22px] border border-stone-200 bg-stone-50 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-ink-950">{item.title}</p>
+                    <p className="mt-1 text-sm text-stone-500">
+                      {item.quantity} {item.unit ?? 'unit'}
+                      {item.category ? ` | ${item.category}` : ''}
+                    </p>
+                    <p className="mt-1 text-sm text-stone-500">{formatDate(item.purchased_on)}</p>
+                    <p className="mt-1 text-sm text-stone-500">
+                      Added by {item.added_by?.name ?? 'Unknown'}
+                    </p>
+                    {item.notes ? <p className="mt-3 text-sm leading-6 text-stone-600">{item.notes}</p> : null}
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge variant="accent">{formatCurrency(item.price)}</Badge>
+                    {item.member ? <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-500">@{item.member.username}</p> : null}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : <EmptyState icon={ShoppingBasket} title="No groceries added" />}
       </Card>
 
       <Card>

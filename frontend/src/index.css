@@ -18,19 +18,30 @@
 }
 
 :root {
-  color: #1c1a17;
-  background:
+  --food-pattern: url("/food-pattern.svg");
+  --app-background-image:
     radial-gradient(circle at top left, rgba(235, 214, 172, 0.75), transparent 34%),
     radial-gradient(circle at top right, rgba(133, 153, 97, 0.18), transparent 30%),
+    var(--food-pattern),
     linear-gradient(180deg, #faf7f0 0%, #f1ebdd 100%);
+  --app-background-size: auto, auto, 320px 320px, auto;
+  --app-background-position: top left, top right, center top, center;
+  --app-background-repeat: no-repeat, no-repeat, repeat, no-repeat;
+  color: #1c1a17;
+  background-color: #faf7f0;
+  background-image: var(--app-background-image);
+  background-size: var(--app-background-size);
+  background-position: var(--app-background-position);
+  background-repeat: var(--app-background-repeat);
 }
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(235, 214, 172, 0.75), transparent 34%),
-    radial-gradient(circle at top right, rgba(133, 153, 97, 0.18), transparent 30%),
-    linear-gradient(180deg, #faf7f0 0%, #f1ebdd 100%);
+  background-color: #faf7f0;
+  background-image: var(--app-background-image);
+  background-size: var(--app-background-size);
+  background-position: var(--app-background-position);
+  background-repeat: var(--app-background-repeat);
   color: #1c1a17;
 }
 

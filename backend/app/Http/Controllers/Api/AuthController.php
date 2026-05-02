@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
+use App\Http\Requests\UpdatePasswordRequest;
+use App\Http\Requests\UpdateProfileRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,24 +15,30 @@ class AuthController extends Controller
 {
     public function login(LoginRequest $request): JsonResponse
     {
+        $request->ensureIsNotRateLimited();
+
         $credentials = $request->validated();
         $user = User::query()->where('username', $credentials['username'])->first();
 
         if (! $user || ! Hash::check($credentials['password'], $user->password)) {
-            return response()->json([
+            $request->hitRateLimit();
+
+            return $this->authResponse([
                 'message' => 'Invalid username or password.',
             ], 422);
         }
 
+        $request->clearRateLimit();
+
         if (! $user->is_active) {
-            return response()->json([
+            return $this->authResponse([
                 'message' => 'Your account is inactive. Please contact an administrator.',
             ], 403);
         }
 
         $token = $user->createToken($user->username.'-'.now()->timestamp)->plainTextToken;
 
-        return response()->json([
+        return $this->authResponse([
             'message' => 'Login successful.',
             'token' => $token,
             'user' => $this->userPayload($user),
@@ -39,8 +47,44 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json([
+        return $this->authResponse([
             'user' => $this->userPayload($request->user()),
+        ]);
+    }
+
+    public function updateProfile(UpdateProfileRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $payload = $request->validated();
+        $payload['email'] = $payload['email'] ?? null;
+
+        $user->fill($payload)->save();
+
+        return $this->authResponse([
+            'message' => 'Profile updated successfully.',
+            'user' => $this->userPayload($user->fresh()),
+        ]);
+    }
+
+    public function updatePassword(UpdatePasswordRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $payload = $request->validated();
+
+        if (! Hash::check($payload['current_password'], $user->password)) {
+            return $this->authResponse([
+                'message' => 'Current password is incorrect.',
+            ], 422);
+        }
+
+        $user->forceFill([
+            'password' => $payload['password'],
+        ])->save();
+
+        return $this->authResponse([
+            'message' => 'Password updated successfully.',
         ]);
     }
 
@@ -48,9 +92,16 @@ class AuthController extends Controller
     {
         $request->user()?->currentAccessToken()?->delete();
 
-        return response()->json([
+        return $this->authResponse([
             'message' => 'Logged out successfully.',
         ]);
+    }
+
+    private function authResponse(array $payload, int $status = 200): JsonResponse
+    {
+        return response()
+            ->json($payload, $status)
+            ->header('Cache-Control', 'no-store, private');
     }
 
     private function userPayload(User $user): array

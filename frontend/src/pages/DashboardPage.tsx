@@ -1,4 +1,4 @@
-import { Activity, CalendarClock, ShoppingCart, Users2 } from 'lucide-react'
+import { Activity, Calculator, CalendarClock, ReceiptText, ShoppingCart, Users2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, getApiErrorMessage } from '../api/client'
 import { Badge } from '../components/ui/Badge'
@@ -57,11 +57,13 @@ export function DashboardPage() {
       <div className="space-y-6">
         <SectionHeading title="Your Meal Overview" />
 
-        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-3 2xl:grid-cols-6">
           <MetricCard icon={CalendarClock} label="Lunch Taken" value={memberDashboard.summary.taken_lunches} />
           <MetricCard icon={CalendarClock} label="Dinner Taken" tone="accent" value={memberDashboard.summary.taken_dinners} />
           <MetricCard icon={Activity} label="Lunch Skipped" tone="neutral" value={memberDashboard.summary.skipped_lunches} />
           <MetricCard icon={Activity} label="Upcoming Skips" tone="accent" value={memberDashboard.summary.upcoming_skips} />
+          <MetricCard icon={Calculator} label="Meal Rate" tone="neutral" value={formatCurrency(memberDashboard.summary.meal_rate)} />
+          <MetricCard icon={ReceiptText} label="Meal Cost" value={formatCurrency(memberDashboard.summary.meal_cost)} />
         </div>
 
         <Card>
@@ -74,6 +76,12 @@ export function DashboardPage() {
               {memberDashboard.active_plan ? (
                 <p className="mt-2 text-sm text-stone-600">
                   {formatDate(memberDashboard.active_plan.start_date)} to {formatDate(memberDashboard.active_plan.end_date)}
+                </p>
+              ) : null}
+              {memberDashboard.active_plan ? (
+                <p className="mt-2 text-sm text-stone-500">
+                  {formatCurrency(memberDashboard.summary.meal_rate)} x {memberDashboard.summary.taken_meals} taken meals ={' '}
+                  {formatCurrency(memberDashboard.summary.meal_cost)}
                 </p>
               ) : null}
             </div>
@@ -122,10 +130,11 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
         <MetricCard icon={Users2} label="Members" value={adminDashboard.counts.members} />
         <MetricCard icon={Users2} label="Admins" tone="neutral" value={adminDashboard.counts.admins} />
-        <MetricCard icon={CalendarClock} label="Today's Meals" tone="accent" value={adminDashboard.today.total_meals} />
+        <MetricCard icon={CalendarClock} label="Today's Lunch" tone="accent" value={adminDashboard.today.lunches} />
+        <MetricCard icon={CalendarClock} label="Today's Dinner" tone="neutral" value={adminDashboard.today.dinners} />
         <MetricCard icon={ShoppingCart} label="Monthly Grocery" value={formatCurrency(adminDashboard.groceries.monthly_spend)} />
       </div>
 

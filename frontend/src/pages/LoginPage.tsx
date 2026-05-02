@@ -1,4 +1,3 @@
-import { LockKeyhole } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -11,8 +10,8 @@ export function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const [form, setForm] = useState({
-    username: 'superadmin',
-    password: 'password123',
+    username: '',
+    password: '',
   })
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -36,11 +35,7 @@ export function LoginPage() {
     <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-xl flex-col items-center justify-center">
         <section className="panel w-full p-6 sm:p-8 lg:p-10">
-          <div className="mb-6 inline-flex rounded-2xl bg-brand-100 p-3 text-brand-700">
-            <LockKeyhole className="h-6 w-6" />
-          </div>
-          <h1 className="text-3xl font-bold">Gaabai khai</h1>
-          <h2 className="mt-4 text-3xl font-bold">Login</h2>
+          <h1 className="text-3xl font-bold">GAABAI KHAI</h1>
 
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <div>
@@ -48,6 +43,7 @@ export function LoginPage() {
                 Username
               </label>
               <Input
+                autoComplete="username"
                 id="username"
                 value={form.username}
                 onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
@@ -59,6 +55,7 @@ export function LoginPage() {
                 Password
               </label>
               <Input
+                autoComplete="current-password"
                 id="password"
                 type="password"
                 value={form.password}

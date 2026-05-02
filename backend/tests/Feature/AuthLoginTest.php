@@ -37,6 +37,50 @@ class AuthLoginTest extends TestCase
         $this->assertNotEmpty($response->json('token'));
     }
 
+    public function test_login_is_rate_limited_after_too_many_failed_attempts(): void
+    {
+        $user = User::query()->create([
+            'name' => 'Limited User',
+            'username' => 'limited-user',
+            'email' => 'limited@example.com',
+            'role' => UserRole::Member->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => now()->toDateString(),
+        ]);
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->postJson('/api/auth/login', [
+                'username' => $user->username,
+                'password' => 'wrong-password',
+            ])->assertUnprocessable();
+        }
+
+        $this->postJson('/api/auth/login', [
+            'username' => $user->username,
+            'password' => 'wrong-password',
+        ])
+            ->assertStatus(429)
+            ->assertJsonValidationErrors('username');
+    }
+
+    public function test_security_headers_are_present_on_public_auth_responses(): void
+    {
+        $response = $this->postJson('/api/auth/login', [
+            'username' => 'missing-user',
+            'password' => 'wrong-password',
+        ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeader('Cross-Origin-Opener-Policy', 'same-origin')
+            ->assertHeader('Permissions-Policy', 'camera=(), geolocation=(), microphone=()')
+            ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('X-Frame-Options', 'DENY');
+    }
+
     public function test_admin_role_can_be_transferred_to_active_member(): void
     {
         $admin = User::query()->create([
