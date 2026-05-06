@@ -16,7 +16,9 @@ class UpsertMealStatusRequest extends FormRequest
     {
         return [
             'skip_lunch' => ['sometimes', 'boolean'],
+            'guest_lunches' => ['sometimes', 'integer', 'min:0', 'max:3'],
             'skip_dinner' => ['sometimes', 'boolean'],
+            'guest_dinners' => ['sometimes', 'integer', 'min:0', 'max:3'],
         ];
     }
 
@@ -27,7 +29,7 @@ class UpsertMealStatusRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
-                if (! $this->hasAny(['skip_lunch', 'skip_dinner'])) {
+                if (! $this->hasAny(['skip_lunch', 'skip_dinner', 'guest_lunches', 'guest_dinners'])) {
                     $validator->errors()->add('skip_lunch', 'At least one meal status field is required.');
                 }
             },

@@ -114,9 +114,19 @@ class AuthLoginTest extends TestCase
 
         Sanctum::actingAs($admin);
 
+        $this
+            ->postJson('/api/users/transfer-admin', [
+                'target_user_id' => $member->id,
+                'confirmation_text' => '@wrong-member',
+                'notes' => 'Weekly handoff',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('confirmation_text');
+
         $response = $this
             ->postJson('/api/users/transfer-admin', [
                 'target_user_id' => $member->id,
+                'confirmation_text' => '@target-member',
                 'notes' => 'Weekly handoff',
             ]);
 

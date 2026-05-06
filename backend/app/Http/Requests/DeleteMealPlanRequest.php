@@ -16,7 +16,7 @@ class DeleteMealPlanRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'confirmation_name' => ['required', 'string', 'max:255'],
+            'confirmation_text' => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -31,8 +31,8 @@ class DeleteMealPlanRequest extends FormRequest
                     return;
                 }
 
-                if ($this->string('confirmation_name')->trim()->value() !== $mealPlan->name) {
-                    $validator->errors()->add('confirmation_name', 'Type the exact meal plan name to delete it.');
+                if ($this->string('confirmation_text')->trim()->value() !== $mealPlan->name) {
+                    $validator->errors()->add('confirmation_text', 'Type the exact meal plan name to delete it.');
                 }
             },
         ];

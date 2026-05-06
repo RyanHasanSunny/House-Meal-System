@@ -15,7 +15,7 @@ export function Badge({
   variant?: keyof typeof badgeVariants
 }) {
   return (
-    <span className={cn('inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]', badgeVariants[variant])}>
+    <span className={cn('inline-flex rounded px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em]', badgeVariants[variant])}>
       {children}
     </span>
   )

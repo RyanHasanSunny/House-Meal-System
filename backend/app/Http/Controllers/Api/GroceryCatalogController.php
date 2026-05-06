@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\DeleteGroceryCatalogItemRequest;
 use App\Http\Requests\StoreGroceryCatalogItemRequest;
 use App\Http\Requests\UpdateGroceryCatalogItemRequest;
 use App\Models\GroceryCatalogItem;
@@ -55,7 +56,7 @@ class GroceryCatalogController extends Controller
         ]);
     }
 
-    public function destroy(GroceryCatalogItem $groceryCatalog): JsonResponse
+    public function destroy(DeleteGroceryCatalogItemRequest $request, GroceryCatalogItem $groceryCatalog): JsonResponse
     {
         $groceryCatalog->delete();
 

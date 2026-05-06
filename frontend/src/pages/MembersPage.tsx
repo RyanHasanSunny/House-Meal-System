@@ -10,6 +10,7 @@ import { Input } from '../components/ui/Input'
 import { SectionHeading } from '../components/ui/SectionHeading'
 import { Select } from '../components/ui/Select'
 import { Spinner } from '../components/ui/Spinner'
+import { TypedDeleteModal } from '../components/ui/TypedDeleteModal'
 import { useAuth } from '../providers/AuthProvider'
 import type { Role, User } from '../types'
 import { formatDate, todayValue } from '../lib/format'
@@ -32,6 +33,7 @@ export function MembersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [transferTarget, setTransferTarget] = useState<User | null>(null)
   const [transferingUserId, setTransferingUserId] = useState<number | null>(null)
 
   async function loadUsers() {
@@ -91,17 +93,29 @@ export function MembersPage() {
     }
   }
 
-  async function handleTransferAdmin(target: User) {
+  function openTransferModal(target: User) {
     setError('')
     setMessage('')
-    setTransferingUserId(target.id)
+    setTransferTarget(target)
+  }
+
+  async function handleTransferAdmin(payload: { confirmation_text: string }) {
+    if (!transferTarget) {
+      return
+    }
+
+    setError('')
+    setMessage('')
+    setTransferingUserId(transferTarget.id)
 
     try {
       const response = await api.post<{ current_admin: User; previous_admin: User; message: string }>('/users/transfer-admin', {
-        target_user_id: target.id,
+        target_user_id: transferTarget.id,
+        ...payload,
       })
 
       await loadUsers()
+      setTransferTarget(null)
       setMessage(response.data.message)
     } catch (transferError) {
       setError(getApiErrorMessage(transferError))
@@ -122,11 +136,11 @@ export function MembersPage() {
   const members = users.filter((entry) => entry.role === 'member')
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <SectionHeading title="Members & Roles" />
 
       <Card>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Current Weekly Admin</p>
               <h2 className="mt-2 text-2xl font-bold">{currentAdmin ? currentAdmin.name : 'No admin assigned'}</h2>
@@ -136,10 +150,10 @@ export function MembersPage() {
           </div>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+      <div className="grid gap-3 xl:grid-cols-[0.95fr_1.05fr]">
         <Card>
-          <div className="mb-5 flex items-center gap-3">
-            <div className="rounded-2xl bg-brand-100 p-3 text-brand-700">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="rounded-md bg-brand-100 p-3 text-brand-700">
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
@@ -147,7 +161,7 @@ export function MembersPage() {
             </div>
           </div>
 
-          <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
+          <form className="grid gap-3 md:grid-cols-2" onSubmit={handleSubmit}>
             <div className="md:col-span-2">
               <label className="field-label">Full Name</label>
               <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
@@ -185,13 +199,13 @@ export function MembersPage() {
             </div>
 
             {error ? (
-              <div className="md:col-span-2 rounded-2xl border border-danger-100 bg-danger-100/60 px-4 py-3 text-sm font-medium whitespace-pre-line text-danger-500">
+              <div className="md:col-span-2 rounded-md border border-danger-100 bg-danger-100/60 px-3 py-2.5 text-sm font-medium whitespace-pre-line text-danger-500">
                 {error}
               </div>
             ) : null}
 
             {message ? (
-              <div className="md:col-span-2 rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
+              <div className="md:col-span-2 rounded-md border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-medium text-brand-700">
                 {message}
               </div>
             ) : null}
@@ -204,11 +218,11 @@ export function MembersPage() {
           </form>
         </Card>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {users.length ? (
             users.map((entry) => (
               <Card key={entry.id}>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-xl font-bold">{entry.name}</h2>
@@ -235,7 +249,7 @@ export function MembersPage() {
                       <Button
                         disabled={transferingUserId === entry.id}
                         variant="secondary"
-                        onClick={() => handleTransferAdmin(entry)}
+                        onClick={() => openTransferModal(entry)}
                       >
                         <RefreshCcw className="mr-2 h-4 w-4" />
                         {transferingUserId === entry.id ? 'Transferring...' : 'Make Admin'}
@@ -252,9 +266,9 @@ export function MembersPage() {
       {members.length ? (
         <Card>
           <h2 className="text-2xl font-bold">Transfer Candidates</h2>
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
             {members.map((member) => (
-              <div key={member.id} className="rounded-[22px] border border-stone-200 bg-stone-50 p-4">
+              <div key={member.id} className="rounded-md border border-stone-200 bg-stone-50 p-3.5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold text-ink-950">{member.name}</p>
@@ -269,6 +283,24 @@ export function MembersPage() {
           </div>
         </Card>
       ) : null}
+
+      <TypedDeleteModal
+        error={error}
+        isOpen={transferTarget !== null}
+        isSubmitting={transferingUserId === transferTarget?.id}
+        submitLabel="Transfer Admin"
+        submittingLabel="Transferring..."
+        targetDescription={
+          transferTarget
+            ? `${transferTarget.name} | @${transferTarget.username} | ${transferTarget.is_active ? 'Active member' : 'Inactive member'}`
+            : ''
+        }
+        targetFieldLabel="Type the exact target member handle"
+        targetLabel={transferTarget ? `@${transferTarget.username}` : ''}
+        title="Transfer Admin Role"
+        onClose={() => setTransferTarget(null)}
+        onConfirm={(payload) => handleTransferAdmin(payload)}
+      />
     </div>
   )
 }

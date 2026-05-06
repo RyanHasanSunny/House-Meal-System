@@ -79,8 +79,16 @@ class MealStatusController extends Controller
             abort(422, 'Lunch skip time has passed.');
         }
 
+        if ($request->has('guest_lunches') && ! $this->canEditMeal($mealStatus, 'lunch')) {
+            abort(422, 'Lunch guest meal time has passed.');
+        }
+
         if ($request->has('skip_dinner') && ! $this->canEditMeal($mealStatus, 'dinner')) {
             abort(422, 'Dinner skip time has passed.');
+        }
+
+        if ($request->has('guest_dinners') && ! $this->canEditMeal($mealStatus, 'dinner')) {
+            abort(422, 'Dinner guest meal time has passed.');
         }
 
         $mealStatus->fill($request->validated())->save();
@@ -142,9 +150,18 @@ class MealStatusController extends Controller
             'id' => $mealStatus->id,
             'meal_date' => $mealStatus->meal_date->toDateString(),
             'skip_lunch' => $mealStatus->skip_lunch,
+            'guest_lunches' => $mealStatus->guest_lunches,
             'skip_dinner' => $mealStatus->skip_dinner,
+            'guest_dinners' => $mealStatus->guest_dinners,
             'lunch_status' => $mealStatus->skip_lunch ? 'skipped' : 'taken',
             'dinner_status' => $mealStatus->skip_dinner ? 'skipped' : 'taken',
+            'lunch_meals' => ($mealStatus->skip_lunch ? 0 : 1) + $mealStatus->guest_lunches,
+            'dinner_meals' => ($mealStatus->skip_dinner ? 0 : 1) + $mealStatus->guest_dinners,
+            'guest_meals' => $mealStatus->guest_lunches + $mealStatus->guest_dinners,
+            'total_meals' => ($mealStatus->skip_lunch ? 0 : 1)
+                + ($mealStatus->skip_dinner ? 0 : 1)
+                + $mealStatus->guest_lunches
+                + $mealStatus->guest_dinners,
             'can_edit' => $canEditLunch || $canEditDinner,
             'can_edit_lunch' => $canEditLunch,
             'can_edit_dinner' => $canEditDinner,

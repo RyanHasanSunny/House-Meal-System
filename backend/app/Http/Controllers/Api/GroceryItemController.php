@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\DeleteGroceryItemRequest;
 use App\Http\Requests\StoreGroceryItemRequest;
 use App\Http\Requests\UpdateGroceryItemRequest;
 use App\Models\GroceryCatalogItem;
@@ -119,7 +120,7 @@ class GroceryItemController extends Controller
         ]);
     }
 
-    public function destroy(GroceryItem $grocery): JsonResponse
+    public function destroy(DeleteGroceryItemRequest $request, GroceryItem $grocery): JsonResponse
     {
         MemberPayment::query()->where('grocery_item_id', $grocery->id)->delete();
 

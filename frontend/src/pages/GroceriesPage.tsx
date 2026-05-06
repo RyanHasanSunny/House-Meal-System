@@ -12,6 +12,7 @@ import { SectionHeading } from '../components/ui/SectionHeading'
 import { Select } from '../components/ui/Select'
 import { Spinner } from '../components/ui/Spinner'
 import { TextArea } from '../components/ui/TextArea'
+import { TypedDeleteModal } from '../components/ui/TypedDeleteModal'
 import { cn } from '../lib/cn'
 import { formatCurrency, formatDate, todayValue } from '../lib/format'
 import { useAuth } from '../providers/AuthProvider'
@@ -79,8 +80,10 @@ export function GroceriesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCatalogSubmitting, setIsCatalogSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<GroceryItem | null>(null)
   const [activeTab, setActiveTab] = useState<'groceries' | 'catalog'>('groceries')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -275,22 +278,34 @@ export function GroceriesPage() {
     }
   }
 
-  async function handleDelete(item: GroceryItem) {
+  function openDeleteModal(item: GroceryItem) {
     setError('')
     setMessage('')
+    setDeleteTarget(item)
+  }
+
+  async function handleDelete(payload: { confirmation_text: string }) {
+    if (!deleteTarget) {
+      return
+    }
+
+    setIsDeleting(true)
 
     try {
-      await api.delete(`/groceries/${item.id}`)
-      const nextItems = items.filter((entry) => entry.id !== item.id)
+      await api.delete(`/groceries/${deleteTarget.id}`, { data: payload })
+      const nextItems = items.filter((entry) => entry.id !== deleteTarget.id)
       setItems(nextItems)
       setMeta((current) => ({
         ...current,
         total_spend: nextItems.reduce((sum, entry) => sum + entry.price, 0),
         item_count: nextItems.length,
       }))
+      setDeleteTarget(null)
       setMessage('Grocery item deleted successfully.')
     } catch (deleteError) {
       setError(getApiErrorMessage(deleteError))
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -320,7 +335,7 @@ export function GroceriesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <SectionHeading title="Meal Plan Groceries" />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -335,7 +350,7 @@ export function GroceriesPage() {
           <div className="flex flex-wrap gap-3">
             <button
               className={cn(
-                'rounded-2xl px-4 py-3 text-sm font-semibold transition',
+                'rounded-md px-3 py-2.5 text-sm font-semibold transition',
                 activeTab === 'groceries'
                   ? 'bg-brand-700 text-white'
                   : 'border border-stone-200 bg-white text-stone-700 hover:border-brand-300 hover:bg-brand-50'
@@ -347,7 +362,7 @@ export function GroceriesPage() {
             </button>
             <button
               className={cn(
-                'rounded-2xl px-4 py-3 text-sm font-semibold transition',
+                'rounded-md px-3 py-2.5 text-sm font-semibold transition',
                 activeTab === 'catalog'
                   ? 'bg-brand-700 text-white'
                   : 'border border-stone-200 bg-white text-stone-700 hover:border-brand-300 hover:bg-brand-50'
@@ -363,7 +378,7 @@ export function GroceriesPage() {
 
       {activeTab === 'groceries' ? (
         <Card>
-          <div className="grid gap-4 md:grid-cols-[1fr_auto_auto] md:items-end">
+          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
             <div>
               <label className="field-label">Meal Plan</label>
               <Select value={selectedMealPlanId} onChange={(event) => void handleMealPlanChange(Number(event.target.value))}>
@@ -375,7 +390,7 @@ export function GroceriesPage() {
               </Select>
             </div>
             {meta.selected_meal_plan ? (
-              <div className="rounded-[22px] border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-stone-700">
+              <div className="rounded-md border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm text-stone-700">
                 {formatDate(meta.selected_meal_plan.start_date)} to {formatDate(meta.selected_meal_plan.end_date)}
               </div>
             ) : null}
@@ -389,23 +404,23 @@ export function GroceriesPage() {
       ) : null}
 
       {error ? (
-        <div className="rounded-2xl border border-danger-100 bg-danger-100/60 px-4 py-3 text-sm font-medium whitespace-pre-line text-danger-500">
+        <div className="rounded-md border border-danger-100 bg-danger-100/60 px-3 py-2.5 text-sm font-medium whitespace-pre-line text-danger-500">
           {error}
         </div>
       ) : null}
 
       {message ? (
-        <div className="rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
+        <div className="rounded-md border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-medium text-brand-700">
           {message}
         </div>
       ) : null}
 
       {activeTab === 'groceries' ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {items.length ? (
             items.map((item) => (
               <Card key={item.id}>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-xl font-bold">{item.title}</h2>
@@ -424,7 +439,7 @@ export function GroceriesPage() {
                   <div className="flex flex-col items-start gap-3 sm:items-end">
                     <Badge variant="accent">{formatCurrency(item.price)}</Badge>
                     {canManageGroceries ? (
-                      <Button variant="ghost" onClick={() => void handleDelete(item)}>
+                      <Button variant="ghost" onClick={() => openDeleteModal(item)}>
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                       </Button>
@@ -443,7 +458,7 @@ export function GroceriesPage() {
 
       {canManageCatalog && activeTab === 'catalog' ? (
         <Card>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-2xl font-bold">Manage Grocery Catalog</h2>
               </div>
@@ -452,9 +467,9 @@ export function GroceriesPage() {
               </Button>
           </div>
 
-          <div className="mt-6 grid gap-3">
+          <div className="mt-4 grid gap-3">
             {catalogItems.map((item) => (
-              <div key={item.id} className="rounded-[22px] border border-stone-200 bg-stone-50 p-4">
+              <div key={item.id} className="rounded-md border border-stone-200 bg-stone-50 p-3.5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -484,8 +499,8 @@ export function GroceriesPage() {
           isAddModalOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
         )}
       >
-        <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] bg-white p-5 shadow-[0_30px_80px_-30px_rgba(21,21,22,0.55)] sm:p-6">
-            <div className="flex items-start justify-between gap-4">
+        <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-md bg-white p-3.5 shadow-[0_30px_80px_-30px_rgba(21,21,22,0.55)] sm:p-3.5">
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="mt-2 text-2xl font-bold">Add Grocery</h2>
               </div>
@@ -494,8 +509,8 @@ export function GroceriesPage() {
             </Button>
           </div>
 
-          <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
-            <div className="md:col-span-2 rounded-[22px] border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-stone-700">
+          <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={handleSubmit}>
+            <div className="md:col-span-2 rounded-md border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm text-stone-700">
               <span className="font-semibold">{user?.name ?? 'Current admin'}</span>
               {user?.username ? ` (@${user.username})` : ''}
             </div>
@@ -531,7 +546,7 @@ export function GroceriesPage() {
               </datalist>
             </div>
             {selectedCatalogItem ? (
-              <div className="md:col-span-2 rounded-[22px] border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">
+              <div className="md:col-span-2 rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-700">
                 Category: <span className="font-semibold">{selectedCatalogItem.category ?? 'General'}</span>
                 {' | '}
                 Default unit: <span className="font-semibold">{selectedCatalogItem.default_unit ?? 'units'}</span>
@@ -593,8 +608,8 @@ export function GroceriesPage() {
           isCatalogModalOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
         )}
       >
-        <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] bg-white p-5 shadow-[0_30px_80px_-30px_rgba(21,21,22,0.55)] sm:p-6">
-            <div className="flex items-start justify-between gap-4">
+        <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-md bg-white p-3.5 shadow-[0_30px_80px_-30px_rgba(21,21,22,0.55)] sm:p-3.5">
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="mt-2 text-2xl font-bold">Add Catalog Item</h2>
               </div>
@@ -603,7 +618,7 @@ export function GroceriesPage() {
             </Button>
           </div>
 
-          <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleCatalogSubmit}>
+          <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={handleCatalogSubmit}>
             <div className="md:col-span-2">
               <label className="field-label">Item Name</label>
               <Input value={catalogForm.name} onChange={(event) => setCatalogForm((current) => ({ ...current, name: event.target.value }))} />
@@ -647,6 +662,23 @@ export function GroceriesPage() {
           </form>
         </div>
       </div>
+
+      <TypedDeleteModal
+        error={error}
+        isOpen={deleteTarget !== null}
+        isSubmitting={isDeleting}
+        submitLabel="Delete Grocery"
+        targetDescription={
+          deleteTarget
+            ? `${deleteTarget.title} | ${formatCurrency(deleteTarget.price)} | ${formatDate(deleteTarget.purchased_on)}`
+            : ''
+        }
+        targetFieldLabel="Type the exact grocery item title"
+        targetLabel={deleteTarget?.title ?? ''}
+        title="Delete Grocery Item"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={(payload) => handleDelete(payload)}
+      />
     </div>
   )
 }

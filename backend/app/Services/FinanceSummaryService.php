@@ -12,11 +12,16 @@ use Illuminate\Support\Collection;
 
 class FinanceSummaryService
 {
+    public function __construct(
+        private readonly MealStatusService $mealStatusService,
+    ) {}
+
     public function buildMonthlySummary(string $month): array
     {
         $monthStart = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
         $monthEnd = $monthStart->copy()->endOfMonth();
         $monthKey = $monthStart->format('Y-m');
+        $countingWindow = $this->mealStatusService->buildCountingWindow($monthStart, $monthEnd);
 
         $statuses = MealStatus::query()
             ->with('user:id,name,username,role,is_active')
@@ -24,6 +29,7 @@ class FinanceSummaryService
             ->whereDate('meal_date', '<=', $monthEnd->toDateString())
             ->orderBy('meal_date')
             ->get();
+        $countedStatuses = $this->mealStatusService->filterStatusesThrough($statuses, $countingWindow['counted_through']);
 
         $groceries = GroceryItem::query()
             ->with(['addedBy:id,name,username', 'member:id,name,username'])
@@ -44,7 +50,7 @@ class FinanceSummaryService
         $historicalStatuses = MealStatus::query()
             ->whereDate('meal_date', '<=', $monthEnd->toDateString())
             ->orderBy('meal_date')
-            ->get(['user_id', 'meal_date', 'skip_lunch', 'skip_dinner']);
+            ->get(['user_id', 'meal_date', 'skip_lunch', 'guest_lunches', 'skip_dinner', 'guest_dinners']);
 
         $historicalGroceries = GroceryItem::query()
             ->whereDate('purchased_on', '<=', $monthEnd->toDateString())
@@ -66,7 +72,7 @@ class FinanceSummaryService
             : collect();
 
         $totalGross = (float) $groceries->sum('price');
-        $totalMeals = $statuses->where('skip_lunch', false)->count() + $statuses->where('skip_dinner', false)->count();
+        $totalMeals = $this->mealStatusService->totalMealCount($countedStatuses);
         $participantCount = $participants->count();
         $perHeadExpense = $participantCount > 0 ? round($totalGross / $participantCount, 2) : 0.0;
         $mealRate = $totalMeals > 0 ? round($totalGross / $totalMeals, 2) : 0.0;
@@ -75,12 +81,18 @@ class FinanceSummaryService
         $statusesByUser = $statuses->groupBy('user_id');
         $rollingBalances = $this->buildRollingBalances($historicalStatuses, $historicalGroceries, $historicalPayments, $monthKey);
 
-        $members = $participants->map(function (User $user) use ($mealRate, $paymentsByUser, $rollingBalances, $statusesByUser): array {
+        $members = $participants->map(function (User $user) use ($countingWindow, $mealRate, $paymentsByUser, $rollingBalances, $statusesByUser): array {
             /** @var Collection<int, MealStatus> $userStatuses */
             $userStatuses = $statusesByUser->get($user->id, collect());
-            $takenLunches = $userStatuses->where('skip_lunch', false)->count();
-            $takenDinners = $userStatuses->where('skip_dinner', false)->count();
-            $takenMeals = $takenLunches + $takenDinners;
+            $countedUserStatuses = $this->mealStatusService->filterStatusesThrough($userStatuses, $countingWindow['counted_through']);
+            $ownLunches = $this->mealStatusService->ownLunchCount($countedUserStatuses);
+            $guestLunches = $this->mealStatusService->guestLunchCount($countedUserStatuses);
+            $takenLunches = $this->mealStatusService->totalLunchCount($countedUserStatuses);
+            $ownDinners = $this->mealStatusService->ownDinnerCount($countedUserStatuses);
+            $guestDinners = $this->mealStatusService->guestDinnerCount($countedUserStatuses);
+            $takenDinners = $this->mealStatusService->totalDinnerCount($countedUserStatuses);
+            $guestMeals = $guestLunches + $guestDinners;
+            $takenMeals = $this->mealStatusService->totalMealCount($countedUserStatuses);
             $payableAmount = round($takenMeals * $mealRate, 2);
             $paidAmount = round((float) $paymentsByUser->get($user->id, collect())->sum('amount'), 2);
             $openingBalance = (float) ($rollingBalances[$user->id]['opening_balance'] ?? 0.0);
@@ -98,8 +110,13 @@ class FinanceSummaryService
                     'role' => $user->role->value,
                     'role_label' => $user->role->label(),
                 ],
+                'own_lunches' => $ownLunches,
+                'guest_lunches' => $guestLunches,
                 'taken_lunches' => $takenLunches,
+                'own_dinners' => $ownDinners,
+                'guest_dinners' => $guestDinners,
                 'taken_dinners' => $takenDinners,
+                'guest_meals' => $guestMeals,
                 'taken_meals' => $takenMeals,
                 'paid_amount' => $paidAmount,
                 'payable_amount' => $payableAmount,
@@ -116,10 +133,12 @@ class FinanceSummaryService
                 'start_date' => $monthStart->toDateString(),
                 'end_date' => $monthEnd->toDateString(),
             ],
+            'counting' => $this->mealStatusService->serializeCountingWindow($countingWindow),
             'totals' => [
                 'total_gross' => round($totalGross, 2),
                 'total_members' => $participantCount,
                 'per_head_expense' => $perHeadExpense,
+                'guest_meals' => $this->mealStatusService->guestLunchCount($countedStatuses) + $this->mealStatusService->guestDinnerCount($countedStatuses),
                 'total_meals' => $totalMeals,
                 'meal_rate' => $mealRate,
                 'total_paid' => round((float) $payments->sum('amount'), 2),
@@ -213,15 +232,19 @@ class FinanceSummaryService
             $monthGroceries = $groceriesByMonth->get($monthKey, collect());
             /** @var Collection<int, MemberPayment> $monthPayments */
             $monthPayments = $paymentsByMonth->get($monthKey, collect());
+            $monthStart = Carbon::createFromFormat('Y-m', $monthKey)->startOfMonth();
+            $monthEnd = $monthStart->copy()->endOfMonth();
+            $monthCountingWindow = $this->mealStatusService->buildCountingWindow($monthStart, $monthEnd);
+            $countedMonthStatuses = $this->mealStatusService->filterStatusesThrough($monthStatuses, $monthCountingWindow['counted_through']);
 
             $monthGross = (float) $monthGroceries->sum('price');
-            $monthMeals = $monthStatuses->where('skip_lunch', false)->count() + $monthStatuses->where('skip_dinner', false)->count();
+            $monthMeals = $this->mealStatusService->totalMealCount($countedMonthStatuses);
             $monthMealRate = $monthMeals > 0 ? round($monthGross / $monthMeals, 2) : 0.0;
 
-            $monthPayablesByUser = $monthStatuses
+            $monthPayablesByUser = $countedMonthStatuses
                 ->groupBy('user_id')
                 ->map(function (Collection $userStatuses) use ($monthMealRate): float {
-                    $takenMeals = $userStatuses->where('skip_lunch', false)->count() + $userStatuses->where('skip_dinner', false)->count();
+                    $takenMeals = $this->mealStatusService->totalMealCount($userStatuses);
 
                     return round($takenMeals * $monthMealRate, 2);
                 });

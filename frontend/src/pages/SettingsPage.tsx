@@ -42,10 +42,10 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <Card>
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-brand-100 p-3 text-brand-700">
+          <div className="rounded-md bg-brand-100 p-3 text-brand-700">
             <Settings2 className="h-5 w-5" />
           </div>
           <div>
@@ -53,14 +53,14 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="mt-5 flex items-center gap-3 overflow-x-auto">
+        <div className="mt-4 flex items-center gap-3 overflow-x-auto">
           {tabs.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               className={cn(
-                'inline-flex shrink-0 items-center justify-center rounded-2xl transition',
+                'inline-flex shrink-0 items-center justify-center rounded-md transition',
                 activeTab === key
-                  ? 'gap-2 bg-brand-700 px-4 py-3 text-sm font-semibold text-white'
+                  ? 'gap-2 bg-brand-700 px-3 py-2.5 text-sm font-semibold text-white'
                   : 'h-12 w-12 border border-stone-200 bg-white text-stone-700 hover:border-brand-300 hover:bg-brand-50'
               )}
               onClick={() => handleTabChange(key)}

@@ -52,7 +52,7 @@ class DashboardTest extends TestCase
             'name' => 'June Weekly Plan',
             'type' => 'custom',
             'start_date' => '2026-06-01',
-            'end_date' => '2026-06-02',
+            'end_date' => '2026-06-07',
             'notes' => null,
             'created_by' => $admin->id,
         ]);
@@ -86,7 +86,67 @@ class DashboardTest extends TestCase
             ->assertJsonPath('data.summary.taken_lunches', 2)
             ->assertJsonPath('data.summary.taken_dinners', 1)
             ->assertJsonPath('data.summary.taken_meals', 3)
+            ->assertJsonPath('data.summary.plan_counted_meals', 7)
+            ->assertJsonPath('data.summary.counting.counted_days', 2)
             ->assertJsonPath('data.summary.meal_rate', 100)
             ->assertJsonPath('data.summary.meal_cost', 300);
+    }
+
+    public function test_admin_dashboard_includes_today_member_lists_for_lunch_and_dinner(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-02 12:00:00', 'Asia/Dhaka'));
+
+        $admin = User::query()->create([
+            'name' => 'Dashboard Admin',
+            'username' => 'today-admin',
+            'email' => 'today-admin@example.com',
+            'role' => UserRole::Admin->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => '2026-06-01',
+        ]);
+
+        $member = User::query()->create([
+            'name' => 'Dashboard Member',
+            'username' => 'today-member',
+            'email' => 'today-member@example.com',
+            'role' => UserRole::Member->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => '2026-06-01',
+        ]);
+
+        $mealPlan = MealPlan::query()->create([
+            'name' => 'June Weekly Plan',
+            'type' => 'custom',
+            'start_date' => '2026-06-01',
+            'end_date' => '2026-06-07',
+            'notes' => null,
+            'created_by' => $admin->id,
+        ]);
+
+        app(MealStatusService::class)->syncStatusesForPlan($mealPlan);
+
+        MealStatus::query()
+            ->where('user_id', $member->id)
+            ->whereDate('meal_date', '2026-06-02')
+            ->update([
+                'skip_dinner' => true,
+                'guest_lunches' => 2,
+            ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/dashboard')
+            ->assertOk()
+            ->assertJsonPath('role', 'admin')
+            ->assertJsonPath('data.today.lunches', 4)
+            ->assertJsonPath('data.today.dinners', 1)
+            ->assertJsonPath('data.today.guest_meals', 2)
+            ->assertJsonPath('data.today.lunch_members.0.username', 'today-admin')
+            ->assertJsonPath('data.today.lunch_members.1.username', 'today-member')
+            ->assertJsonPath('data.today.lunch_members.1.guest_meals', 2)
+            ->assertJsonPath('data.today.dinner_members.0.username', 'today-admin')
+            ->assertJsonCount(1, 'data.today.dinner_members');
     }
 }

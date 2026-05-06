@@ -38,7 +38,9 @@ class MealStatusService
                     'meal_plan_id' => $mealPlan->id,
                     'meal_date' => $date->toDateString(),
                     'skip_lunch' => false,
+                    'guest_lunches' => 0,
                     'skip_dinner' => false,
+                    'guest_dinners' => 0,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
@@ -78,7 +80,9 @@ class MealStatusService
                     'meal_plan_id' => $mealPlan->id,
                     'meal_date' => $date->toDateString(),
                     'skip_lunch' => false,
+                    'guest_lunches' => 0,
                     'skip_dinner' => false,
+                    'guest_dinners' => 0,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
@@ -108,32 +112,161 @@ class MealStatusService
             ->orderBy('meal_date')
             ->get();
 
+        $countingWindow = $this->buildCountingWindow($mealPlan->start_date, $mealPlan->end_date);
+        $countedStatuses = $this->filterStatusesThrough($statuses, $countingWindow['counted_through']);
+
         return [
             'member_count' => $statuses->pluck('user_id')->unique()->count(),
-            'tracked_days' => $mealPlan->start_date->diffInDays($mealPlan->end_date) + 1,
-            'totals' => [
-                'taken_lunches' => $statuses->where('skip_lunch', false)->count(),
-                'skipped_lunches' => $statuses->where('skip_lunch', true)->count(),
-                'taken_dinners' => $statuses->where('skip_dinner', false)->count(),
-                'skipped_dinners' => $statuses->where('skip_dinner', true)->count(),
-                'taken_meals' => $statuses->where('skip_lunch', false)->count() + $statuses->where('skip_dinner', false)->count(),
-            ],
-            'members' => $this->memberSummary($statuses),
-            'days' => $this->dailySummary($statuses),
+            'tracked_days' => $countingWindow['total_days'],
+            'counting' => $this->serializeCountingWindow($countingWindow),
+            'totals' => $this->totalsSummary($countedStatuses),
+            'members' => $this->memberSummary($statuses, $countingWindow['counted_through']),
+            'days' => $this->dailySummary($countedStatuses),
         ];
+    }
+
+    /**
+     * @return array{
+     *     counted_through: ?Carbon,
+     *     counted_days: int,
+     *     total_days: int,
+     *     remaining_days: int,
+     *     status: 'not_started'|'in_progress'|'completed'
+     * }
+     */
+    public function buildCountingWindow(Carbon $startDate, Carbon $endDate, ?Carbon $referenceDate = null): array
+    {
+        $start = $startDate->copy()->startOfDay();
+        $end = $endDate->copy()->startOfDay();
+        $reference = ($referenceDate ?? today())->copy()->startOfDay();
+        $totalDays = $start->diffInDays($end) + 1;
+
+        if ($reference->lt($start)) {
+            return [
+                'counted_through' => null,
+                'counted_days' => 0,
+                'total_days' => $totalDays,
+                'remaining_days' => $totalDays,
+                'status' => 'not_started',
+            ];
+        }
+
+        $countedThrough = $reference->lte($end) ? $reference : $end->copy();
+        $countedDays = $start->diffInDays($countedThrough) + 1;
+        $remainingDays = max($totalDays - $countedDays, 0);
+
+        return [
+            'counted_through' => $countedThrough,
+            'counted_days' => $countedDays,
+            'total_days' => $totalDays,
+            'remaining_days' => $remainingDays,
+            'status' => $remainingDays === 0 ? 'completed' : 'in_progress',
+        ];
+    }
+
+    /**
+     * @return array{
+     *     counted_through: ?string,
+     *     counted_days: int,
+     *     total_days: int,
+     *     remaining_days: int,
+     *     status: 'not_started'|'in_progress'|'completed'
+     * }
+     */
+    public function serializeCountingWindow(array $countingWindow): array
+    {
+        return [
+            'counted_through' => $countingWindow['counted_through']?->toDateString(),
+            'counted_days' => $countingWindow['counted_days'],
+            'total_days' => $countingWindow['total_days'],
+            'remaining_days' => $countingWindow['remaining_days'],
+            'status' => $countingWindow['status'],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, MealStatus>  $statuses
+     * @return Collection<int, MealStatus>
+     */
+    public function filterStatusesThrough(Collection $statuses, ?Carbon $countedThrough): Collection
+    {
+        if (! $countedThrough) {
+            return $statuses->filter(fn () => false);
+        }
+
+        return $statuses->filter(
+            fn (MealStatus $status): bool => $status->meal_date->lte($countedThrough)
+        );
+    }
+
+    /**
+     * @param  Collection<int, MealStatus>  $statuses
+     */
+    public function ownLunchCount(Collection $statuses): int
+    {
+        return $statuses->where('skip_lunch', false)->count();
+    }
+
+    /**
+     * @param  Collection<int, MealStatus>  $statuses
+     */
+    public function ownDinnerCount(Collection $statuses): int
+    {
+        return $statuses->where('skip_dinner', false)->count();
+    }
+
+    /**
+     * @param  Collection<int, MealStatus>  $statuses
+     */
+    public function guestLunchCount(Collection $statuses): int
+    {
+        return (int) $statuses->sum(fn (MealStatus $status): int => (int) $status->guest_lunches);
+    }
+
+    /**
+     * @param  Collection<int, MealStatus>  $statuses
+     */
+    public function guestDinnerCount(Collection $statuses): int
+    {
+        return (int) $statuses->sum(fn (MealStatus $status): int => (int) $status->guest_dinners);
+    }
+
+    /**
+     * @param  Collection<int, MealStatus>  $statuses
+     */
+    public function totalLunchCount(Collection $statuses): int
+    {
+        return $this->ownLunchCount($statuses) + $this->guestLunchCount($statuses);
+    }
+
+    /**
+     * @param  Collection<int, MealStatus>  $statuses
+     */
+    public function totalDinnerCount(Collection $statuses): int
+    {
+        return $this->ownDinnerCount($statuses) + $this->guestDinnerCount($statuses);
+    }
+
+    /**
+     * @param  Collection<int, MealStatus>  $statuses
+     */
+    public function totalMealCount(Collection $statuses): int
+    {
+        return $this->totalLunchCount($statuses) + $this->totalDinnerCount($statuses);
     }
 
     /**
      * @param  Collection<int, MealStatus>  $statuses
      * @return array<int, array<string, mixed>>
      */
-    private function memberSummary(Collection $statuses): array
+    private function memberSummary(Collection $statuses, ?Carbon $countedThrough): array
     {
         return $statuses
             ->groupBy('user_id')
-            ->map(function (Collection $items): array {
+            ->map(function (Collection $items) use ($countedThrough): array {
                 /** @var MealStatus $first */
                 $first = $items->first();
+                $countedItems = $this->filterStatusesThrough($items, $countedThrough);
 
                 return [
                     'user' => [
@@ -141,11 +274,19 @@ class MealStatusService
                         'name' => $first->user->name,
                         'username' => $first->user->username,
                     ],
-                    'taken_lunches' => $items->where('skip_lunch', false)->count(),
-                    'skipped_lunches' => $items->where('skip_lunch', true)->count(),
-                    'taken_dinners' => $items->where('skip_dinner', false)->count(),
-                    'skipped_dinners' => $items->where('skip_dinner', true)->count(),
-                    'taken_meals' => $items->where('skip_lunch', false)->count() + $items->where('skip_dinner', false)->count(),
+                    'own_lunches' => $this->ownLunchCount($countedItems),
+                    'guest_lunches' => $this->guestLunchCount($countedItems),
+                    'taken_lunches' => $this->totalLunchCount($countedItems),
+                    'skipped_lunches' => $countedItems->where('skip_lunch', true)->count(),
+                    'own_dinners' => $this->ownDinnerCount($countedItems),
+                    'guest_dinners' => $this->guestDinnerCount($countedItems),
+                    'taken_dinners' => $this->totalDinnerCount($countedItems),
+                    'skipped_dinners' => $countedItems->where('skip_dinner', true)->count(),
+                    'guest_meals' => $this->guestLunchCount($countedItems) + $this->guestDinnerCount($countedItems),
+                    'taken_meals' => $this->totalMealCount($countedItems),
+                    'days' => $items->map(
+                        fn (MealStatus $status): array => $this->memberDaySummary($status, $countedThrough)
+                    )->values()->all(),
                 ];
             })
             ->values()
@@ -162,13 +303,65 @@ class MealStatusService
             ->groupBy(fn (MealStatus $status) => $status->meal_date->toDateString())
             ->map(fn (Collection $items, string $date): array => [
                 'date' => $date,
-                'taken_lunches' => $items->where('skip_lunch', false)->count(),
+                'own_lunches' => $this->ownLunchCount($items),
+                'guest_lunches' => $this->guestLunchCount($items),
+                'taken_lunches' => $this->totalLunchCount($items),
                 'skipped_lunches' => $items->where('skip_lunch', true)->count(),
-                'taken_dinners' => $items->where('skip_dinner', false)->count(),
+                'own_dinners' => $this->ownDinnerCount($items),
+                'guest_dinners' => $this->guestDinnerCount($items),
+                'taken_dinners' => $this->totalDinnerCount($items),
                 'skipped_dinners' => $items->where('skip_dinner', true)->count(),
+                'guest_meals' => $this->guestLunchCount($items) + $this->guestDinnerCount($items),
+                'taken_meals' => $this->totalMealCount($items),
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * @param  Collection<int, MealStatus>  $statuses
+     * @return array{
+     *     taken_lunches: int,
+     *     skipped_lunches: int,
+     *     taken_dinners: int,
+     *     skipped_dinners: int,
+     *     taken_meals: int
+     * }
+     */
+    private function totalsSummary(Collection $statuses): array
+    {
+        return [
+            'own_lunches' => $this->ownLunchCount($statuses),
+            'guest_lunches' => $this->guestLunchCount($statuses),
+            'taken_lunches' => $this->totalLunchCount($statuses),
+            'skipped_lunches' => $statuses->where('skip_lunch', true)->count(),
+            'own_dinners' => $this->ownDinnerCount($statuses),
+            'guest_dinners' => $this->guestDinnerCount($statuses),
+            'taken_dinners' => $this->totalDinnerCount($statuses),
+            'skipped_dinners' => $statuses->where('skip_dinner', true)->count(),
+            'guest_meals' => $this->guestLunchCount($statuses) + $this->guestDinnerCount($statuses),
+            'taken_meals' => $this->totalMealCount($statuses),
+        ];
+    }
+
+    private function memberDaySummary(MealStatus $status, ?Carbon $countedThrough): array
+    {
+        $isCounted = $countedThrough ? $status->meal_date->lte($countedThrough) : false;
+        $lunchMeals = ($status->skip_lunch ? 0 : 1) + (int) $status->guest_lunches;
+        $dinnerMeals = ($status->skip_dinner ? 0 : 1) + (int) $status->guest_dinners;
+
+        return [
+            'date' => $status->meal_date->toDateString(),
+            'counted' => $isCounted,
+            'lunch_status' => $status->skip_lunch ? 'skipped' : 'taken',
+            'guest_lunches' => (int) $status->guest_lunches,
+            'lunch_meals' => $lunchMeals,
+            'dinner_status' => $status->skip_dinner ? 'skipped' : 'taken',
+            'guest_dinners' => (int) $status->guest_dinners,
+            'dinner_meals' => $dinnerMeals,
+            'guest_meals' => (int) $status->guest_lunches + (int) $status->guest_dinners,
+            'meal_total' => $lunchMeals + $dinnerMeals,
+        ];
     }
 
     /**

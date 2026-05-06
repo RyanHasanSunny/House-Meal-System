@@ -17,6 +17,13 @@ class MealPlanManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
     public function test_admin_can_create_plan_and_generate_member_statuses(): void
     {
         $admin = User::query()->create([
@@ -74,6 +81,8 @@ class MealPlanManagementTest extends TestCase
 
     public function test_admin_can_create_exact_seven_day_weekly_plan(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-06-03 09:00:00', 'Asia/Dhaka'));
+
         $admin = User::query()->create([
             'name' => 'House Admin',
             'username' => 'weekly-admin',
@@ -81,7 +90,7 @@ class MealPlanManagementTest extends TestCase
             'role' => UserRole::Admin->value,
             'password' => 'password123',
             'is_active' => true,
-            'joined_at' => now()->toDateString(),
+            'joined_at' => '2026-06-01',
         ]);
 
         User::query()->create([
@@ -107,7 +116,8 @@ class MealPlanManagementTest extends TestCase
         $response
             ->assertCreated()
             ->assertJsonPath('data.summary.tracked_days', 7)
-            ->assertJsonPath('data.summary.totals.taken_meals', 28);
+            ->assertJsonPath('data.summary.counting.counted_days', 3)
+            ->assertJsonPath('data.summary.totals.taken_meals', 12);
     }
 
     public function test_admin_can_create_monthly_plan_from_any_start_date_using_month_length(): void
@@ -316,12 +326,12 @@ class MealPlanManagementTest extends TestCase
         Sanctum::actingAs($superAdmin);
 
         $this->deleteJson("/api/meal-plans/{$mealPlan->id}", [
-            'confirmation_name' => 'Wrong Name',
+            'confirmation_text' => 'Wrong Name',
         ])->assertStatus(422)
-            ->assertJsonValidationErrors('confirmation_name');
+            ->assertJsonValidationErrors('confirmation_text');
 
         $this->deleteJson("/api/meal-plans/{$mealPlan->id}", [
-            'confirmation_name' => 'Delete Me Plan',
+            'confirmation_text' => 'Delete Me Plan',
         ])->assertOk()
             ->assertJsonPath('message', 'Meal plan deleted successfully.');
 
@@ -355,7 +365,102 @@ class MealPlanManagementTest extends TestCase
         Sanctum::actingAs($admin);
 
         $this->deleteJson("/api/meal-plans/{$mealPlan->id}", [
-            'confirmation_name' => 'Protected Plan',
+            'confirmation_text' => 'Protected Plan',
         ])->assertForbidden();
+    }
+
+    public function test_admin_can_delete_grocery_item_after_three_typed_confirmations(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Groceries Admin',
+            'username' => 'delete-groceries-admin',
+            'email' => 'delete-groceries-admin@example.com',
+            'role' => UserRole::Admin->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => now()->toDateString(),
+        ]);
+
+        $mealPlan = MealPlan::query()->create([
+            'name' => 'Delete Grocery Plan',
+            'type' => 'custom',
+            'start_date' => '2026-06-10',
+            'end_date' => '2026-06-20',
+            'notes' => null,
+            'created_by' => $admin->id,
+        ]);
+
+        $grocery = \App\Models\GroceryItem::query()->create([
+            'meal_plan_id' => $mealPlan->id,
+            'member_id' => $admin->id,
+            'title' => 'Onion',
+            'category' => 'Vegetable',
+            'quantity' => 4,
+            'unit' => 'kg',
+            'price' => 220,
+            'purchased_on' => '2026-06-11',
+            'notes' => null,
+            'added_by' => $admin->id,
+        ]);
+
+        $payment = MemberPayment::query()->create([
+            'user_id' => $admin->id,
+            'grocery_item_id' => $grocery->id,
+            'amount' => 220,
+            'paid_on' => '2026-06-11',
+            'notes' => 'Grocery payment',
+            'recorded_by' => $admin->id,
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->deleteJson("/api/groceries/{$grocery->id}", [
+            'confirmation_text' => 'Wrong Title',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('confirmation_text');
+
+        $this->deleteJson("/api/groceries/{$grocery->id}", [
+            'confirmation_text' => 'Onion',
+        ])->assertOk()
+            ->assertJsonPath('message', 'Grocery item deleted successfully.');
+
+        $this->assertDatabaseMissing('grocery_items', ['id' => $grocery->id]);
+        $this->assertDatabaseMissing('member_payments', ['id' => $payment->id]);
+    }
+
+    public function test_super_admin_can_delete_catalog_item_after_three_typed_confirmations(): void
+    {
+        $superAdmin = User::query()->create([
+            'name' => 'Catalog Super Admin',
+            'username' => 'catalog-super-admin',
+            'email' => 'catalog-super-admin@example.com',
+            'role' => UserRole::SuperAdmin->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => now()->toDateString(),
+        ]);
+
+        $catalogItem = GroceryCatalogItem::query()->create([
+            'name' => 'Salt',
+            'category' => 'Staples',
+            'default_unit' => 'kg',
+            'sort_order' => 1,
+            'is_active' => true,
+            'created_by' => $superAdmin->id,
+        ]);
+
+        Sanctum::actingAs($superAdmin);
+
+        $this->deleteJson("/api/grocery-catalog/{$catalogItem->id}", [
+            'confirmation_text' => 'Wrong Item',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('confirmation_text');
+
+        $this->deleteJson("/api/grocery-catalog/{$catalogItem->id}", [
+            'confirmation_text' => 'Salt',
+        ])->assertOk()
+            ->assertJsonPath('message', 'Catalog item deleted successfully.');
+
+        $this->assertDatabaseMissing('grocery_catalog_items', ['id' => $catalogItem->id]);
     }
 }

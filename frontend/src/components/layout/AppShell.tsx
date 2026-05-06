@@ -24,21 +24,21 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto flex min-h-screen max-w-[1600px] gap-6 px-4 py-4 sm:px-6 lg:px-8">
-        <aside className="panel subtle-grid hidden w-[280px] shrink-0 flex-col p-6 lg:flex">
+      <div className="mx-auto flex min-h-screen max-w-[1600px] gap-2.5 px-2.5 py-2.5 sm:px-4 lg:px-5">
+        <aside className="panel subtle-grid hidden w-[252px] shrink-0 flex-col p-3.5 lg:flex">
           <div>
-            <div className="rounded-[26px] bg-ink-950 p-5 text-white shadow-[0_18px_40px_-24px_rgba(21,21,22,0.8)]">
+            <div className="rounded-md bg-ink-950 p-3.5 text-white shadow-[0_18px_40px_-24px_rgba(21,21,22,0.8)]">
               <h2 className="text-2xl font-bold text-white">GAABAI KHAI</h2>
             </div>
 
-            <nav className="mt-6 space-y-2">
+            <nav className="mt-4 space-y-2">
               {items.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
                   to={to}
                   end={to === '/'}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                    `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition ${
                       isActive ? 'bg-brand-700 text-white' : 'text-stone-700 hover:bg-brand-50'
                     }`
                   }
@@ -49,7 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               ))}
             </nav>
 
-            <div className="mt-6 rounded-[24px] border border-brand-100 bg-white/70 p-4">
+            <div className="mt-4 rounded-md border border-brand-100 bg-white/70 p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="font-semibold text-ink-950">{user.name}</p>
@@ -66,7 +66,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col pb-24 lg:pb-0">
-          <header className="mb-4 flex items-center justify-between gap-3 rounded-[28px] border border-white/10 bg-ink-950 p-4 text-white shadow-[0_18px_40px_-24px_rgba(21,21,22,0.8)] lg:hidden">
+          <header className="mb-3 flex items-center justify-between gap-3 rounded-md border border-white/10 bg-ink-950 p-3.5 text-white shadow-[0_18px_40px_-24px_rgba(21,21,22,0.8)] lg:hidden">
             <div className="min-w-0">
               <p className="text-xs font-semibold tracking-[0.24em] text-white/65">GAABAI KHAI</p>
               <p className="truncate text-sm text-white/80">@{user.username}</p>
@@ -83,14 +83,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <main className="flex-1">{children}</main>
 
-          <footer className="px-2 pt-8 text-center text-xs leading-6 text-stone-500 sm:px-4">
+          <footer className="px-2 pt-5 text-center text-xs leading-6 text-stone-500 sm:px-4">
             <p>Developed by Ryan Hasan Sunny</p>
             <p>Inspired by Hasib Talukdar, MD Fahad Hossain, Jisan Hawladar</p>
           </footer>
         </div>
       </div>
 
-      <nav className="panel fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-2xl px-1.5 py-1.5 lg:hidden">
+      <nav className="panel fixed bottom-3 left-3 right-3 z-50 mx-auto max-w-2xl px-1.5 py-1.5 lg:hidden">
         <div
           className="grid gap-1.5"
           style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `flex min-w-0 flex-col items-center justify-center gap-1 rounded-[18px] px-2 py-1.5 text-[9px] font-semibold leading-[1.05] text-center transition ${
+                `flex min-w-0 flex-col items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[9px] font-semibold leading-[1.05] text-center transition ${
                   isActive ? 'bg-brand-700 text-white' : 'text-stone-500 hover:bg-brand-50'
                 }`
               }

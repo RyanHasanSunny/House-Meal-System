@@ -32,12 +32,12 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-xl flex-col items-center justify-center">
-        <section className="panel w-full p-6 sm:p-8 lg:p-10">
+    <div className="min-h-screen px-3 py-4 sm:px-5 lg:px-6">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-xl flex-col items-center justify-center">
+        <section className="panel w-full p-3.5 sm:p-5 lg:p-6">
           <h1 className="text-3xl font-bold">GAABAI KHAI</h1>
 
-          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+          <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
             <div>
               <label className="field-label" htmlFor="username">
                 Username
@@ -64,7 +64,7 @@ export function LoginPage() {
             </div>
 
             {error ? (
-              <div className="rounded-2xl border border-danger-100 bg-danger-100/60 px-4 py-3 text-sm font-medium text-danger-500">
+              <div className="rounded-md border border-danger-100 bg-danger-100/60 px-3 py-2.5 text-sm font-medium text-danger-500">
                 {error}
               </div>
             ) : null}
@@ -75,7 +75,7 @@ export function LoginPage() {
           </form>
         </section>
 
-        <footer className="px-2 pt-8 text-center text-xs leading-6 text-stone-500 sm:px-4">
+        <footer className="px-2 pt-5 text-center text-xs leading-6 text-stone-500 sm:px-4">
           <p>Developed by Ryan Hasan Sunny</p>
           <p>Inspired by Hasib Talukdar, MD Fahad Hossain, Jisan Hawladar</p>
         </footer>

@@ -21,7 +21,7 @@ class DashboardController extends Controller
         if ($user->role->value === UserRole::Member->value) {
             return response()->json([
                 'role' => $user->role->value,
-                'data' => $this->memberDashboard($user),
+                'data' => $this->memberDashboard($user, $mealStatusService),
             ]);
         }
 
@@ -31,7 +31,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    private function memberDashboard(User $user): array
+    private function memberDashboard(User $user, MealStatusService $mealStatusService): array
     {
         $mealPlan = MealPlan::query()
             ->whereDate('start_date', '<=', today()->toDateString())
@@ -54,10 +54,19 @@ class DashboardController extends Controller
                 ->get()
             : collect();
 
-        $takenLunches = $statuses->where('skip_lunch', false)->count();
-        $takenDinners = $statuses->where('skip_dinner', false)->count();
-        $takenMeals = $takenLunches + $takenDinners;
-        $totalPlanMeals = $planStatuses->where('skip_lunch', false)->count() + $planStatuses->where('skip_dinner', false)->count();
+        $countingWindow = $mealPlan
+            ? $mealStatusService->buildCountingWindow($mealPlan->start_date, $mealPlan->end_date)
+            : null;
+        $countedStatuses = $mealStatusService->filterStatusesThrough($statuses, $countingWindow['counted_through'] ?? null);
+        $countedPlanStatuses = $mealStatusService->filterStatusesThrough($planStatuses, $countingWindow['counted_through'] ?? null);
+
+        $guestLunches = $mealStatusService->guestLunchCount($countedStatuses);
+        $takenLunches = $mealStatusService->totalLunchCount($countedStatuses);
+        $guestDinners = $mealStatusService->guestDinnerCount($countedStatuses);
+        $takenDinners = $mealStatusService->totalDinnerCount($countedStatuses);
+        $guestMeals = $guestLunches + $guestDinners;
+        $takenMeals = $mealStatusService->totalMealCount($countedStatuses);
+        $totalPlanMeals = $mealStatusService->totalMealCount($countedPlanStatuses);
         $mealRate = $mealPlan && $totalPlanMeals > 0
             ? round((float) $mealPlan->groceryItems()->sum('price') / $totalPlanMeals, 2)
             : 0.0;
@@ -75,14 +84,19 @@ class DashboardController extends Controller
                 : null,
             'summary' => [
                 'taken_lunches' => $takenLunches,
-                'skipped_lunches' => $statuses->where('skip_lunch', true)->count(),
+                'guest_lunches' => $guestLunches,
+                'skipped_lunches' => $countedStatuses->where('skip_lunch', true)->count(),
                 'taken_dinners' => $takenDinners,
-                'skipped_dinners' => $statuses->where('skip_dinner', true)->count(),
+                'guest_dinners' => $guestDinners,
+                'skipped_dinners' => $countedStatuses->where('skip_dinner', true)->count(),
+                'guest_meals' => $guestMeals,
                 'taken_meals' => $takenMeals,
+                'plan_counted_meals' => $totalPlanMeals,
                 'meal_rate' => $mealRate,
                 'meal_cost' => $mealCost,
+                'counting' => $countingWindow ? $mealStatusService->serializeCountingWindow($countingWindow) : null,
                 'upcoming_skips' => $statuses
-                    ->filter(fn (MealStatus $status) => $status->meal_date->gte(today()) && ($status->skip_lunch || $status->skip_dinner))
+                    ->filter(fn (MealStatus $status) => $status->meal_date->gt(today()) && ($status->skip_lunch || $status->skip_dinner))
                     ->count(),
             ],
             'upcoming' => $statuses
@@ -92,7 +106,10 @@ class DashboardController extends Controller
                     'id' => $status->id,
                     'meal_date' => $status->meal_date->toDateString(),
                     'skip_lunch' => $status->skip_lunch,
+                    'guest_lunches' => $status->guest_lunches,
                     'skip_dinner' => $status->skip_dinner,
+                    'guest_dinners' => $status->guest_dinners,
+                    'guest_meals' => $status->guest_lunches + $status->guest_dinners,
                 ])
                 ->values()
                 ->all(),
@@ -109,6 +126,7 @@ class DashboardController extends Controller
 
         $todayStatuses = $activePlan
             ? MealStatus::query()
+                ->with('user:id,name,username')
                 ->where('meal_plan_id', $activePlan->id)
                 ->whereDate('meal_date', $today)
                 ->get()
@@ -133,9 +151,34 @@ class DashboardController extends Controller
                 'meal_plans' => MealPlan::query()->count(),
             ],
             'today' => [
-                'lunches' => $todayStatuses->where('skip_lunch', false)->count(),
-                'dinners' => $todayStatuses->where('skip_dinner', false)->count(),
-                'total_meals' => $todayStatuses->where('skip_lunch', false)->count() + $todayStatuses->where('skip_dinner', false)->count(),
+                'lunches' => $mealStatusService->totalLunchCount($todayStatuses),
+                'dinners' => $mealStatusService->totalDinnerCount($todayStatuses),
+                'guest_meals' => $mealStatusService->guestLunchCount($todayStatuses) + $mealStatusService->guestDinnerCount($todayStatuses),
+                'total_meals' => $mealStatusService->totalMealCount($todayStatuses),
+                'lunch_members' => $todayStatuses
+                    ->filter(fn (MealStatus $status): bool => ! $status->skip_lunch && $status->user !== null)
+                    ->sortBy(fn (MealStatus $status): string => $status->user?->name ?? '')
+                    ->map(fn (MealStatus $status): array => [
+                        'id' => $status->user->id,
+                        'name' => $status->user->name,
+                        'username' => $status->user->username,
+                        'guest_meals' => (int) $status->guest_lunches,
+                        'total_meals' => 1 + (int) $status->guest_lunches,
+                    ])
+                    ->values()
+                    ->all(),
+                'dinner_members' => $todayStatuses
+                    ->filter(fn (MealStatus $status): bool => ! $status->skip_dinner && $status->user !== null)
+                    ->sortBy(fn (MealStatus $status): string => $status->user?->name ?? '')
+                    ->map(fn (MealStatus $status): array => [
+                        'id' => $status->user->id,
+                        'name' => $status->user->name,
+                        'username' => $status->user->username,
+                        'guest_meals' => (int) $status->guest_dinners,
+                        'total_meals' => 1 + (int) $status->guest_dinners,
+                    ])
+                    ->values()
+                    ->all(),
             ],
             'current_admin' => $currentAdmin
                 ? [

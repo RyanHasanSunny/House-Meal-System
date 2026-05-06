@@ -12,7 +12,9 @@ class MealStatus extends Model
         'meal_plan_id',
         'meal_date',
         'skip_lunch',
+        'guest_lunches',
         'skip_dinner',
+        'guest_dinners',
     ];
 
     protected function casts(): array
@@ -20,7 +22,9 @@ class MealStatus extends Model
         return [
             'meal_date' => 'date',
             'skip_lunch' => 'boolean',
+            'guest_lunches' => 'integer',
             'skip_dinner' => 'boolean',
+            'guest_dinners' => 'integer',
         ];
     }
 

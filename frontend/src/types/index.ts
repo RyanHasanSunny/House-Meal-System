@@ -1,5 +1,14 @@
 export type Role = 'super_admin' | 'admin' | 'member'
 export type MealPlanType = 'weekly' | 'monthly' | 'custom'
+export type CountingWindowStatus = 'not_started' | 'in_progress' | 'completed'
+
+export interface CountingWindow {
+  counted_through: string | null
+  counted_days: number
+  total_days: number
+  remaining_days: number
+  status: CountingWindowStatus
+}
 
 export interface User {
   id: number
@@ -15,29 +24,58 @@ export interface User {
 
 export interface MealPlanSummaryMember {
   user: Pick<User, 'id' | 'name' | 'username'>
+  own_lunches: number
+  guest_lunches: number
   taken_lunches: number
   skipped_lunches: number
+  own_dinners: number
+  guest_dinners: number
   taken_dinners: number
   skipped_dinners: number
+  guest_meals: number
   taken_meals: number
+  days: Array<{
+    date: string
+    counted: boolean
+    lunch_status: 'taken' | 'skipped'
+    guest_lunches: number
+    lunch_meals: number
+    dinner_status: 'taken' | 'skipped'
+    guest_dinners: number
+    dinner_meals: number
+    guest_meals: number
+    meal_total: number
+  }>
 }
 
 export interface MealPlanSummaryDay {
   date: string
+  own_lunches: number
+  guest_lunches: number
   taken_lunches: number
   skipped_lunches: number
+  own_dinners: number
+  guest_dinners: number
   taken_dinners: number
   skipped_dinners: number
+  guest_meals: number
+  taken_meals: number
 }
 
 export interface MealPlanSummary {
   member_count: number
   tracked_days: number
+  counting: CountingWindow
   totals: {
+    own_lunches: number
+    guest_lunches: number
     taken_lunches: number
     skipped_lunches: number
+    own_dinners: number
+    guest_dinners: number
     taken_dinners: number
     skipped_dinners: number
+    guest_meals: number
     taken_meals: number
   }
   members: MealPlanSummaryMember[]
@@ -119,9 +157,15 @@ export interface MealStatus {
   id: number
   meal_date: string
   skip_lunch: boolean
+  guest_lunches: number
   skip_dinner: boolean
+  guest_dinners: number
   lunch_status: 'taken' | 'skipped'
   dinner_status: 'taken' | 'skipped'
+  lunch_meals: number
+  dinner_meals: number
+  guest_meals: number
+  total_meals: number
   can_edit: boolean
   can_edit_lunch: boolean
   can_edit_dinner: boolean
@@ -157,7 +201,22 @@ export interface AdminDashboardData {
   today: {
     lunches: number
     dinners: number
+    guest_meals: number
     total_meals: number
+    lunch_members: Array<{
+      id: number
+      name: string
+      username: string
+      guest_meals: number
+      total_meals: number
+    }>
+    dinner_members: Array<{
+      id: number
+      name: string
+      username: string
+      guest_meals: number
+      total_meals: number
+    }>
   }
   current_admin: {
     id: number
@@ -196,19 +255,27 @@ export interface MemberDashboardData {
   } | null
   summary: {
     taken_lunches: number
+    guest_lunches: number
     skipped_lunches: number
     taken_dinners: number
+    guest_dinners: number
     skipped_dinners: number
+    guest_meals: number
     taken_meals: number
+    plan_counted_meals: number
     meal_rate: number
     meal_cost: number
+    counting: CountingWindow | null
     upcoming_skips: number
   }
   upcoming: Array<{
     id: number
     meal_date: string
     skip_lunch: boolean
+    guest_lunches: number
     skip_dinner: boolean
+    guest_dinners: number
+    guest_meals: number
   }>
 }
 
@@ -218,10 +285,12 @@ export interface MonthlyFinanceSummary {
     start_date: string
     end_date: string
   }
+  counting: CountingWindow
   totals: {
     total_gross: number
     total_members: number
     per_head_expense: number
+    guest_meals: number
     total_meals: number
     meal_rate: number
     total_paid: number
@@ -229,8 +298,13 @@ export interface MonthlyFinanceSummary {
   }
   members: Array<{
     user: Pick<User, 'id' | 'name' | 'username' | 'role' | 'role_label'>
+    own_lunches: number
+    guest_lunches: number
     taken_lunches: number
+    own_dinners: number
+    guest_dinners: number
     taken_dinners: number
+    guest_meals: number
     taken_meals: number
     paid_amount: number
     payable_amount: number

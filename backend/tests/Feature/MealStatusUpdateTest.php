@@ -105,6 +105,92 @@ class MealStatusUpdateTest extends TestCase
             ->assertJsonPath('message', 'Dinner skip time has passed.');
     }
 
+    public function test_member_can_add_guest_meals_up_to_three_before_cutoff(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-02 12:00:00', 'Asia/Dhaka'));
+
+        $member = User::query()->create([
+            'name' => 'Guest Host',
+            'username' => 'guest-host',
+            'email' => 'guest-host@example.com',
+            'role' => UserRole::Member->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => '2026-05-01',
+        ]);
+
+        $mealPlan = MealPlan::query()->create([
+            'name' => 'May Meal Plan',
+            'type' => 'custom',
+            'start_date' => '2026-05-01',
+            'end_date' => '2026-05-07',
+            'notes' => null,
+            'created_by' => $member->id,
+        ]);
+
+        $status = MealStatus::query()->create([
+            'user_id' => $member->id,
+            'meal_plan_id' => $mealPlan->id,
+            'meal_date' => '2026-05-02',
+            'skip_lunch' => false,
+            'skip_dinner' => false,
+        ]);
+
+        Sanctum::actingAs($member);
+
+        $this->patchJson("/api/meal-statuses/{$status->id}", [
+            'guest_lunches' => 3,
+        ])->assertOk()
+            ->assertJsonPath('data.guest_lunches', 3)
+            ->assertJsonPath('data.lunch_meals', 4)
+            ->assertJsonPath('data.guest_meals', 3)
+            ->assertJsonPath('data.total_meals', 5);
+
+        $this->patchJson("/api/meal-statuses/{$status->id}", [
+            'guest_lunches' => 4,
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('guest_lunches');
+    }
+
+    public function test_member_cannot_add_lunch_guest_meals_after_lunch_cutoff(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-02 15:00:00', 'Asia/Dhaka'));
+
+        $member = User::query()->create([
+            'name' => 'Late Guest Host',
+            'username' => 'late-guest-host',
+            'email' => 'late-guest-host@example.com',
+            'role' => UserRole::Member->value,
+            'password' => 'password123',
+            'is_active' => true,
+            'joined_at' => '2026-05-01',
+        ]);
+
+        $mealPlan = MealPlan::query()->create([
+            'name' => 'May Meal Plan',
+            'type' => 'custom',
+            'start_date' => '2026-05-01',
+            'end_date' => '2026-05-07',
+            'notes' => null,
+            'created_by' => $member->id,
+        ]);
+
+        $status = MealStatus::query()->create([
+            'user_id' => $member->id,
+            'meal_plan_id' => $mealPlan->id,
+            'meal_date' => '2026-05-02',
+            'skip_lunch' => false,
+            'skip_dinner' => false,
+        ]);
+
+        Sanctum::actingAs($member);
+
+        $this->patchJson("/api/meal-statuses/{$status->id}", [
+            'guest_lunches' => 1,
+        ])->assertStatus(422)
+            ->assertJsonPath('message', 'Lunch guest meal time has passed.');
+    }
+
     public function test_meal_status_ownership_check_handles_numeric_string_user_ids(): void
     {
         $member = new User();

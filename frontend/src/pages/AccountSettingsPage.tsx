@@ -107,9 +107,9 @@ export function AccountSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <Card>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Account Overview</p>
             <h2 className="mt-2 text-2xl font-bold">{user.name}</h2>
@@ -126,14 +126,14 @@ export function AccountSettingsPage() {
         </div>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-2">
         <Card>
           <div>
             <h2 className="text-2xl font-bold">Update Information</h2>
             <p className="mt-2 text-sm text-stone-500">Change your personal details and username here.</p>
           </div>
 
-          <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleProfileSubmit}>
+          <form className="mt-4 grid gap-3 md:grid-cols-2" onSubmit={handleProfileSubmit}>
             <div className="md:col-span-2">
               <label className="field-label">Full Name</label>
               <Input
@@ -165,13 +165,13 @@ export function AccountSettingsPage() {
             </div>
 
             {profileError ? (
-              <div className="md:col-span-2 rounded-2xl border border-danger-100 bg-danger-100/60 px-4 py-3 text-sm font-medium whitespace-pre-line text-danger-500">
+              <div className="md:col-span-2 rounded-md border border-danger-100 bg-danger-100/60 px-3 py-2.5 text-sm font-medium whitespace-pre-line text-danger-500">
                 {profileError}
               </div>
             ) : null}
 
             {profileMessage ? (
-              <div className="md:col-span-2 rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
+              <div className="md:col-span-2 rounded-md border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-medium text-brand-700">
                 {profileMessage}
               </div>
             ) : null}
@@ -190,7 +190,7 @@ export function AccountSettingsPage() {
             <p className="mt-2 text-sm text-stone-500">Use your current password to set a new one.</p>
           </div>
 
-          <form className="mt-6 space-y-4" onSubmit={handlePasswordSubmit}>
+          <form className="mt-4 space-y-3" onSubmit={handlePasswordSubmit}>
             <div>
               <label className="field-label">Current Password</label>
               <Input
@@ -224,13 +224,13 @@ export function AccountSettingsPage() {
             </div>
 
             {passwordError ? (
-              <div className="rounded-2xl border border-danger-100 bg-danger-100/60 px-4 py-3 text-sm font-medium whitespace-pre-line text-danger-500">
+              <div className="rounded-md border border-danger-100 bg-danger-100/60 px-3 py-2.5 text-sm font-medium whitespace-pre-line text-danger-500">
                 {passwordError}
               </div>
             ) : null}
 
             {passwordMessage ? (
-              <div className="rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
+              <div className="rounded-md border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-medium text-brand-700">
                 {passwordMessage}
               </div>
             ) : null}

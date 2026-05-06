@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\DeleteMemberPaymentRequest;
 use App\Http\Requests\StoreMemberPaymentRequest;
 use App\Models\MemberPayment;
 use Illuminate\Http\JsonResponse;
@@ -43,7 +44,7 @@ class MemberPaymentController extends Controller
         ], 201);
     }
 
-    public function destroy(MemberPayment $memberPayment): JsonResponse
+    public function destroy(DeleteMemberPaymentRequest $request, MemberPayment $memberPayment): JsonResponse
     {
         $memberPayment->delete();
 

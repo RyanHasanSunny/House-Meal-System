@@ -127,15 +127,13 @@ export function MealsPage() {
     }
   }
 
-  async function toggleMeal(status: MealStatus, field: 'skip_lunch' | 'skip_dinner') {
+  async function updateMealStatus(status: MealStatus, payload: Partial<Pick<MealStatus, 'skip_lunch' | 'skip_dinner' | 'guest_lunches' | 'guest_dinners'>>) {
     setError('')
     setMessage('')
     setSavingId(status.id)
 
     try {
-      const response = await api.patch<{ data: MealStatus }>(`/meal-statuses/${status.id}`, {
-        [field]: !status[field],
-      })
+      const response = await api.patch<{ data: MealStatus }>(`/meal-statuses/${status.id}`, payload)
 
       setStatuses((current) => current.map((entry) => (entry.id === status.id ? response.data.data : entry)))
       setMessage('Meal status updated successfully.')
@@ -164,6 +162,18 @@ export function MealsPage() {
     }
   }
 
+  function toggleMeal(status: MealStatus, field: 'skip_lunch' | 'skip_dinner') {
+    void updateMealStatus(status, {
+      [field]: !status[field],
+    })
+  }
+
+  function updateGuestMeals(status: MealStatus, field: 'guest_lunches' | 'guest_dinners', nextValue: number) {
+    void updateMealStatus(status, {
+      [field]: Math.min(Math.max(nextValue, 0), 3),
+    })
+  }
+
   if (isLoading) {
     return (
       <div className="panel flex min-h-[320px] items-center justify-center">
@@ -177,7 +187,7 @@ export function MealsPage() {
     : []
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <SectionHeading
         title={canManageMemberMeals ? 'Meal Statuses' : 'My Meals'}
         copy={
@@ -189,7 +199,7 @@ export function MealsPage() {
 
       {canManageMemberMeals ? (
         <Card>
-          <div className="grid gap-4 md:grid-cols-[280px_1fr] md:items-end">
+          <div className="grid gap-3 md:grid-cols-[280px_1fr] md:items-end">
             <div>
               <label className="field-label">View Member</label>
               <Select
@@ -203,7 +213,7 @@ export function MealsPage() {
                 ))}
               </Select>
             </div>
-            <div className="rounded-[22px] border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-stone-700">
+            <div className="rounded-md border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm text-stone-700">
               {meta ? `${meta.selected_user.name} (@${meta.selected_user.username})` : 'Select a member to manage meal statuses.'}
             </div>
           </div>
@@ -212,7 +222,7 @@ export function MealsPage() {
 
       {meta?.meal_plan ? (
         <Card>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Selected Plan</p>
               <h2 className="mt-2 text-2xl font-bold">{meta.meal_plan.name}</h2>
@@ -226,19 +236,19 @@ export function MealsPage() {
       ) : null}
 
       {error ? (
-        <div className="rounded-2xl border border-danger-100 bg-danger-100/60 px-4 py-3 text-sm font-medium text-danger-500">
+        <div className="rounded-md border border-danger-100 bg-danger-100/60 px-3 py-2.5 text-sm font-medium text-danger-500">
           {error}
         </div>
       ) : null}
 
       {message ? (
-        <div className="rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700">
+        <div className="rounded-md border border-brand-100 bg-brand-50 px-3 py-2.5 text-sm font-medium text-brand-700">
           {message}
         </div>
       ) : null}
 
       {statuses.length ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {statuses.map((status) => {
             const canEditLunch = status.can_edit_lunch && isMealEditableLocally(status.meal_date, 'lunch', now)
             const canEditDinner = status.can_edit_dinner && isMealEditableLocally(status.meal_date, 'dinner', now)
@@ -250,51 +260,93 @@ export function MealsPage() {
                     <p className="text-sm font-semibold text-stone-500">{formatDate(status.meal_date)}</p>
                     <h2 className="mt-2 text-xl font-bold text-ink-950">{status.meal_date}</h2>
                   </div>
-                  <Badge variant={status.skip_lunch || status.skip_dinner ? 'accent' : 'brand'}>
-                    {status.skip_lunch || status.skip_dinner ? 'Custom status' : 'All taken'}
+                  <Badge variant={status.skip_lunch || status.skip_dinner || status.guest_meals ? 'accent' : 'brand'}>
+                    {status.skip_lunch || status.skip_dinner || status.guest_meals ? 'Custom status' : 'All taken'}
                   </Badge>
                 </div>
 
-                <div className="mt-5 grid gap-3">
-                  <div className="rounded-[22px] border border-stone-200 bg-stone-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
+                <div className="mt-4 grid gap-3">
+                  <div className="rounded-md border border-stone-200 bg-stone-50 p-3.5">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="rounded-2xl bg-brand-100 p-2 text-brand-700">
+                        <div className="rounded-md bg-brand-100 p-2 text-brand-700">
                           <Soup className="h-4 w-4" />
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-ink-950">Lunch</p>
                           <p className="text-sm text-stone-500">{status.skip_lunch ? 'Marked as skipped' : 'Counted as taken'}</p>
+                          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                            Guest meals {status.guest_lunches} / 3
+                          </p>
                         </div>
                       </div>
-                      <Button
-                        disabled={!canEditLunch || savingId === status.id}
-                        variant={status.skip_lunch ? 'danger' : 'ghost'}
-                        onClick={() => toggleMeal(status, 'skip_lunch')}
-                      >
-                        {status.skip_lunch ? 'Undo Skip' : 'Skip Lunch'}
-                      </Button>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <Button
+                          disabled={!canEditLunch || savingId === status.id}
+                          variant={status.skip_lunch ? 'danger' : 'ghost'}
+                          onClick={() => toggleMeal(status, 'skip_lunch')}
+                        >
+                          {status.skip_lunch ? 'Undo Skip' : 'Skip Lunch'}
+                        </Button>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            disabled={!canEditLunch || savingId === status.id || status.guest_lunches <= 0}
+                            variant="ghost"
+                            onClick={() => updateGuestMeals(status, 'guest_lunches', status.guest_lunches - 1)}
+                          >
+                            - Guest
+                          </Button>
+                          <Button
+                            disabled={!canEditLunch || savingId === status.id || status.guest_lunches >= 3}
+                            variant="ghost"
+                            onClick={() => updateGuestMeals(status, 'guest_lunches', status.guest_lunches + 1)}
+                          >
+                            + Guest
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="rounded-[22px] border border-stone-200 bg-stone-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
+                  <div className="rounded-md border border-stone-200 bg-stone-50 p-3.5">
+                    <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="rounded-2xl bg-accent-100 p-2 text-[#9a5d1d]">
+                        <div className="rounded-md bg-accent-100 p-2 text-[#9a5d1d]">
                           <CalendarCheck2 className="h-4 w-4" />
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-ink-950">Dinner</p>
                           <p className="text-sm text-stone-500">{status.skip_dinner ? 'Marked as skipped' : 'Counted as taken'}</p>
+                          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">
+                            Guest meals {status.guest_dinners} / 3
+                          </p>
                         </div>
                       </div>
-                      <Button
-                        disabled={!canEditDinner || savingId === status.id}
-                        variant={status.skip_dinner ? 'danger' : 'ghost'}
-                        onClick={() => toggleMeal(status, 'skip_dinner')}
-                      >
-                        {status.skip_dinner ? 'Undo Skip' : 'Skip Dinner'}
-                      </Button>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <Button
+                          disabled={!canEditDinner || savingId === status.id}
+                          variant={status.skip_dinner ? 'danger' : 'ghost'}
+                          onClick={() => toggleMeal(status, 'skip_dinner')}
+                        >
+                          {status.skip_dinner ? 'Undo Skip' : 'Skip Dinner'}
+                        </Button>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            disabled={!canEditDinner || savingId === status.id || status.guest_dinners <= 0}
+                            variant="ghost"
+                            onClick={() => updateGuestMeals(status, 'guest_dinners', status.guest_dinners - 1)}
+                          >
+                            - Guest
+                          </Button>
+                          <Button
+                            disabled={!canEditDinner || savingId === status.id || status.guest_dinners >= 3}
+                            variant="ghost"
+                            onClick={() => updateGuestMeals(status, 'guest_dinners', status.guest_dinners + 1)}
+                          >
+                            + Guest
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
